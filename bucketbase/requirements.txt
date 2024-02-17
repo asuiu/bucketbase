@@ -1,0 +1,4 @@
+filelock==3.0.12
+minio==7.1.15
+pyxtension
+streamerate
