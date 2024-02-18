@@ -25,7 +25,7 @@ class MemoryBucket(IBucket):
         with self._lock:
             self._objects[_name] = _content
 
-    def get_object(self, name: PurePosixPath) -> bytes:
+    def get_object(self, name: PurePosixPath | str) -> bytes:
         _name = self._validate_name(name)
 
         with self._lock:
@@ -33,14 +33,14 @@ class MemoryBucket(IBucket):
                 raise FileNotFoundError(f"Object {_name} not found in MemoryObjectStore")
             return self._objects[_name]
 
-    def list_objects(self, prefix: PurePosixPath) -> slist[PurePosixPath]:
+    def list_objects(self, prefix: PurePosixPath | str = "") -> slist[PurePosixPath]:
         self._split_prefix(prefix)  # validate prefix
         str_prefix = str(prefix)
         with self._lock:
             result = stream(self._objects).filter(lambda obj: str(obj).startswith(str_prefix)).map(PurePosixPath).to_list()
         return result
 
-    def shallow_list_objects(self, prefix: PurePosixPath) -> ShallowListing:
+    def shallow_list_objects(self, prefix: PurePosixPath | str = "") -> ShallowListing:
         self._split_prefix(prefix)  # validate prefix
         str_prefix = str(prefix)
         pref_len = len(str_prefix)

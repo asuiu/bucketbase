@@ -10,6 +10,7 @@ from typing import Tuple, Optional, Union, Iterable
 from pyxtension import PydanticValidated, validate
 from pyxtension.models import ImmutableExtModel
 from streamerate import slist
+from typing_extensions import Self
 
 from bucketbase.errors import DeleteError
 
@@ -124,7 +125,7 @@ class IBucket(PydanticValidated, ABC):
         self.remove_objects(objects)
 
     @abstractmethod
-    def list_objects(self, prefix: PurePosixPath | str) -> slist[PurePosixPath]:
+    def list_objects(self, prefix: PurePosixPath | str = "") -> slist[PurePosixPath]:
         """
         Performs a deep/recursive listing of all objects with given prefix.
 
@@ -133,7 +134,7 @@ class IBucket(PydanticValidated, ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def shallow_list_objects(self, prefix: PurePosixPath | str) -> ShallowListing:
+    def shallow_list_objects(self, prefix: PurePosixPath | str = "") -> ShallowListing:
         """
         Performs a shallow listing of all objects with given prefix.
         It will return a list of objects and a list of common prefixes (equivalent to directories on FileSystems).
@@ -155,6 +156,33 @@ class IBucket(PydanticValidated, ABC):
         """
         raise NotImplementedError()
 
+    def copy_prefix(self, dest_bucket: Self, src_prefix: PurePosixPath | str, dst_prefix: PurePosixPath | str = "", threads: int = 1) -> None:
+        """
+        Copies all objects with given src_prefix to the dst_prefix, from self to dest_bucket.
+        """
+        validate(threads > 0, "threads must be greater than 0")
+        src_objects = self.list_objects(src_prefix)
+        if not isinstance(dst_prefix, str):
+            dst_prefix = str(dst_prefix)
+        if not isinstance(src_prefix, str):
+            src_prefix = str(src_prefix)
+        src_pref_len = len(src_prefix)
+
+        def _copy_object(src_obj: PurePosixPath | str) -> None:
+            obj = str(src_obj)
+            assert obj.startswith(src_prefix)
+            name = dst_prefix + obj[src_pref_len:]
+            dest_bucket.put_object(name, self.get_object(src_obj))
+
+        src_objects.fastmap(_copy_object, poolSize=threads).size()
+
+    def move_prefix(self, dest_bucket: Self, src_prefix: PurePosixPath | str, dst_prefix: PurePosixPath | str = "", threads: int = 1) -> None:
+        """
+        Moves all objects with given src_prefix to the dst_prefix, from src_bucket to self.
+        """
+        self.copy_prefix(dest_bucket, src_prefix, dst_prefix, threads)
+        self.remove_prefix(src_prefix)
+
 
 class AbstractAppendOnlySynchronizedBucket(IBucket):
     """
@@ -162,7 +190,7 @@ class AbstractAppendOnlySynchronizedBucket(IBucket):
     so we'll need to synchronize the access to the LocalFS cache.
     """
 
-    def __init__(self, base_bucket: IBucket) -> None:
+    def __init__(self, base_bucket: Self) -> None:
         self._base_bucket = base_bucket
 
     def put_object(self, name: PurePosixPath | str, content: Union[str, bytes, bytearray]) -> None:
@@ -182,10 +210,10 @@ class AbstractAppendOnlySynchronizedBucket(IBucket):
             self._unlock_object(name)
         return content
 
-    def list_objects(self, prefix: PurePosixPath | str) -> slist[PurePosixPath]:
+    def list_objects(self, prefix: PurePosixPath | str = "") -> slist[PurePosixPath]:
         return self._base_bucket.list_objects(prefix)
 
-    def shallow_list_objects(self, prefix: PurePosixPath | str) -> ShallowListing:
+    def shallow_list_objects(self, prefix: PurePosixPath | str = "") -> ShallowListing:
         return self._base_bucket.shallow_list_objects(prefix)
 
     def exists(self, name: PurePosixPath | str) -> bool:

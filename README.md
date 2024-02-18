@@ -54,6 +54,22 @@ bucket.put_object("greet.txt", "Hello, Minio!")
 print(bucket.get_object("greet.txt"))  # Outputs: b'Hello, Minio!'
 ```
 
+### Copy and Move objects by Prefix
+You can copy and move objects between buckets by prefix.
+
+```python
+from bucketbase.minio_bucket import MinioBucket
+
+bucket = MinioBucket(endpoint="localhost:9000", access_key="minioadmin", secret_key="minioadmin", secure=False)
+dest_bucket = MinioBucket(endpoint="localhost:9000", access_key="minioadmin", secret_key="minioadmin", secure=False, bucket_name="new_bucket")
+bucket.put_object("greet.txt", "Hello, Minio!")
+
+bucket.copy_prefix(dest_bucket=dest_bucket, src_prefix="greet.", dst_prefix="copy_dir/")
+bucket.move_prefix(dest_bucket=dest_bucket, src_prefix="greet.", dst_prefix="move_dir/")                   
+```
+
+
+
 ## Advanced Usage
 For advanced usage, including error handling, listing objects, and more, refer to the IBucket interface and the specific implementation you are using. Each storage option may have additional methods and features tailored to its backend.
 
@@ -64,6 +80,9 @@ Contributions are welcome! If you'd like to contribute, please fork the reposito
 The code in this project is licensed under MIT license.
 
 ### Changelog
+##### 1.2.1 
+- Added IBucket.copy_prefix() & IBucket.move_prefix()
+- minor refactoring and default params
 
 ##### 1.2.0 (breaking changes)
 - rename all IBucket method args: object_name -> name

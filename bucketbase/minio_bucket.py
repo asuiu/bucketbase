@@ -102,14 +102,14 @@ class MinioBucket(IBucket):
         _name = self._validate_name(name)
         self._minio_client.fput_object(self._bucket_name, _name, str(file_path))
 
-    def list_objects(self, prefix: PurePosixPath | str) -> slist[PurePosixPath]:
+    def list_objects(self, prefix: PurePosixPath | str = "") -> slist[PurePosixPath]:
         self._split_prefix(prefix)  # validate prefix
         _prefix = str(prefix)
         listing_itr = self._minio_client.list_objects(bucket_name=self._bucket_name, prefix=_prefix, recursive=True)
         object_names = stream(listing_itr).map(Object.object_name.fget).map(PurePosixPath).to_list()
         return object_names
 
-    def shallow_list_objects(self, prefix: PurePosixPath | str) -> ShallowListing:
+    def shallow_list_objects(self, prefix: PurePosixPath | str = "") -> ShallowListing:
         """
         Performs a non-recursive listing of all objects with given prefix.
         """

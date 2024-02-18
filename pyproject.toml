@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "bucketbase"
-version = "1.2.0"  # do not edit manually. kept in sync with `tool.commitizen` config via automation
+version = "1.2.1"  # do not edit manually. kept in sync with `tool.commitizen` config via automation
 description = "bucketbase"
 authors = ["Andrei Suiu <andrei.suiu@gmail.com>"]
 repository = "https://github.com/asuiu/bucketbase"
@@ -14,6 +14,9 @@ streamerate = ">=1.0.5"
 pyxtension = ">=1.16.9"
 StrEnum = ">=0.4.0"
 tsx = ">=0.1.16"
+filelock= ">3.0.12"
+typing_extensions = ">=4.9.0"
+
 
 [tool.poetry.extras]
 minio = ["minio", "multiminio"]
@@ -62,7 +65,7 @@ unfixable = []
 
 [tool.commitizen]
 name = "cz_conventional_commits"
-version = "1.2.0"  # do not edit manually. kept in sync with `tool.poetry` config via automation
+version = "1.2.1"  # do not edit manually. kept in sync with `tool.poetry` config via automation
 tag_format = "v$version"
 
 # Same as Black.

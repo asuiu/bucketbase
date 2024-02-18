@@ -5,8 +5,8 @@ from typing import Iterable, Union
 from streamerate import slist
 
 from bucketbase.errors import DeleteError
-from bucketbase.ibucket import ShallowListing, IBucket
 from bucketbase.fs_bucket import AppendOnlyFSBucket
+from bucketbase.ibucket import ShallowListing, IBucket
 
 
 class CachedImmutableBucket(IBucket):
@@ -25,10 +25,10 @@ class CachedImmutableBucket(IBucket):
     def put_object(self, name: PurePosixPath | str, content: Union[str, bytes, bytearray]) -> None:
         raise io.UnsupportedOperation("put_object is not supported for CachedImmutableMinioObjectStorage")
 
-    def list_objects(self, prefix: PurePosixPath | str) -> slist[PurePosixPath]:
+    def list_objects(self, prefix: PurePosixPath | str = "") -> slist[PurePosixPath]:
         return self._main.list_objects(prefix)
 
-    def shallow_list_objects(self, prefix: PurePosixPath | str) -> ShallowListing:
+    def shallow_list_objects(self, prefix: PurePosixPath | str = "") -> ShallowListing:
         return self._main.shallow_list_objects(prefix)
 
     def exists(self, name: PurePosixPath | str) -> bool:

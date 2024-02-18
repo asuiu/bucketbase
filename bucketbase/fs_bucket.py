@@ -56,7 +56,7 @@ class FSBucket(IBucket):
                 matching_objects.append(PurePosixPath(relative_path))
         return matching_objects
 
-    def list_objects(self, prefix: PurePosixPath | str) -> slist[PurePosixPath]:
+    def list_objects(self, prefix: PurePosixPath | str = "") -> slist[PurePosixPath]:
         """
         Performs a deep/recursive listing of all objects with given prefix.
         """
@@ -69,7 +69,7 @@ class FSBucket(IBucket):
         matching_objects = self._get_recurs_listing(start_list_lpath, s_prefix)
         return matching_objects
 
-    def shallow_list_objects(self, prefix: PurePosixPath | str) -> ShallowListing:
+    def shallow_list_objects(self, prefix: PurePosixPath | str = "") -> ShallowListing:
         """
         Performs a non-recursive listing of all objects with given prefix.
         """
