@@ -20,6 +20,10 @@ S3_NAME_SAFE_RE = rf"^[{S3_NAME_CHARS_NO_SEP}][{S3_NAME_CHARS_NO_SEP}/]+$"
 
 @dataclass(frozen=True)
 class ShallowListing(ImmutableExtModel):
+    """
+    :param objects: list of object names, as PurePosixPath
+    :param prefixes: list of prefixes (equivalent to directories on FileSystems) as strings, ending with "/"
+    """
     objects: slist[PurePosixPath]
     prefixes: slist[str]
 
@@ -156,7 +160,7 @@ class IBucket(PydanticValidated, ABC):
         """
         raise NotImplementedError()
 
-    def copy_prefix(self, dest_bucket: Self, src_prefix: PurePosixPath | str, dst_prefix: PurePosixPath | str = "", threads: int = 1) -> None:
+    def copy_prefix(self, dst_bucket: Self, src_prefix: PurePosixPath | str, dst_prefix: PurePosixPath | str = "", threads: int = 1) -> None:
         """
         Copies all objects with given src_prefix to the dst_prefix, from self to dest_bucket.
         """
@@ -172,15 +176,17 @@ class IBucket(PydanticValidated, ABC):
             obj = str(src_obj)
             assert obj.startswith(src_prefix)
             name = dst_prefix + obj[src_pref_len:]
-            dest_bucket.put_object(name, self.get_object(src_obj))
+            if name.startswith("/"):
+                name = name[1:]
+            dst_bucket.put_object(name, self.get_object(src_obj))
 
         src_objects.fastmap(_copy_object, poolSize=threads).size()
 
-    def move_prefix(self, dest_bucket: Self, src_prefix: PurePosixPath | str, dst_prefix: PurePosixPath | str = "", threads: int = 1) -> None:
+    def move_prefix(self, dst_bucket: Self, src_prefix: PurePosixPath | str, dst_prefix: PurePosixPath | str = "", threads: int = 1) -> None:
         """
         Moves all objects with given src_prefix to the dst_prefix, from src_bucket to self.
         """
-        self.copy_prefix(dest_bucket, src_prefix, dst_prefix, threads)
+        self.copy_prefix(dst_bucket, src_prefix, dst_prefix, threads)
         self.remove_prefix(src_prefix)
 
 

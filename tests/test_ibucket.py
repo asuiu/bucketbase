@@ -85,6 +85,27 @@ class TestIBucket(TestCase):
                             PurePosixPath('ectory_file.txt')]
         self.assertEqual(objects, expected_objects)
 
+    def test_copy_dir_prefix_to_root(self):
+        """
+        This covers a regression where the destination object name starts with "/", like /dir2/file1.txt
+        as "dir1/dir2" - "dir1" = "/dir2"
+        """
+        src_bucket = MemoryBucket()
+        dst_bucket = MemoryBucket()
+
+        src_bucket.put_object("dir1/dir2/file1.txt", b"content1")
+        src_bucket.put_object("dir1/dir2/file2.txt", b"content2")
+        src_bucket.put_object("dir1/file4.txt", b"content4")
+        src_bucket.put_object("directory_file.txt", b"content5")
+
+        src_bucket.copy_prefix(dst_bucket, src_prefix="dir1")
+
+        objects = dst_bucket.list_objects()
+        expected_objects = [PurePosixPath('dir2/file1.txt'),
+                            PurePosixPath('dir2/file2.txt'),
+                            PurePosixPath('file4.txt')]
+        self.assertEqual(objects, expected_objects)
+
     def test_copy_prefix_from_dir_to_root(self):
         src_bucket = MemoryBucket()
         dst_bucket = MemoryBucket()

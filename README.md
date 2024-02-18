@@ -19,6 +19,8 @@ Install BucketBase using pip:
 pip install bucketbase
 ```
 
+PyPi home page: [https://pypi.org/project/bucketbase/](https://pypi.org/project/bucketbase/)
+
 Quick Start
 To get started with BucketBase, first import the storage class you wish to use:
 
@@ -71,8 +73,8 @@ bucket = MinioBucket(endpoint="localhost:9000", access_key="minioadmin", secret_
 dest_bucket = MinioBucket(endpoint="localhost:9000", access_key="minioadmin", secret_key="minioadmin", secure=False, bucket_name="new_bucket")
 bucket.put_object("greet.txt", "Hello, Minio!")
 
-bucket.copy_prefix(dest_bucket=dest_bucket, src_prefix="greet.", dst_prefix="copy_dir/")
-bucket.move_prefix(dest_bucket=dest_bucket, src_prefix="greet.", dst_prefix="move_dir/")                   
+bucket.copy_prefix(dst_bucket=dest_bucket, src_prefix="greet.", dst_prefix="copy_dir/")
+bucket.move_prefix(dst_bucket=dest_bucket, src_prefix="greet.", dst_prefix="move_dir/")                   
 ```
 
 ## Advanced Usage
@@ -89,6 +91,9 @@ Contributions are welcome! If you'd like to contribute, please fork the reposito
 The code in this project is licensed under MIT license.
 
 ### Changelog
+##### 1.2.3
+- Fixed corner-case where IBucket.copy_prefix copies to root
+- Renamed arg dest_bucket -> dst_bucket
 
 ##### 1.2.2
 
