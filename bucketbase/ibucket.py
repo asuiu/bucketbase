@@ -14,6 +14,8 @@ from typing_extensions import Self
 
 from bucketbase.errors import DeleteError
 
+# Source: https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-keys.html
+# As an exception - we won't allow "*" as a valid character in the name due to complications with the file systems
 S3_NAME_CHARS_NO_SEP = r"\w!\-\.')("
 S3_NAME_SAFE_RE = rf"^[{S3_NAME_CHARS_NO_SEP}][{S3_NAME_CHARS_NO_SEP}/]+$"
 
@@ -100,7 +102,7 @@ class IBucket(PydanticValidated, ABC):
 
     def fget_object(self, name: PurePosixPath | str, file_path: Path) -> None:
         random_suffix = uuid.uuid4().hex[:8]
-        tmp_file_path = file_path.parent / f"{file_path.name}.{random_suffix}.part.minio"
+        tmp_file_path = file_path.parent / f"_{file_path.name}.{random_suffix}.part"
 
         try:
             response = self.get_object(name)
@@ -165,7 +167,7 @@ class IBucket(PydanticValidated, ABC):
         Copies all objects with given src_prefix to the dst_prefix, from self to dest_bucket.
         """
         validate(threads > 0, "threads must be greater than 0")
-        src_objects = self.list_objects(src_prefix)
+        src_objects = self.list_objects(src_prefix).to_list()
         if not isinstance(dst_prefix, str):
             dst_prefix = str(dst_prefix)
         if not isinstance(src_prefix, str):
@@ -180,7 +182,8 @@ class IBucket(PydanticValidated, ABC):
                 name = name[1:]
             dst_bucket.put_object(name, self.get_object(src_obj))
 
-        src_objects.fastmap(_copy_object, poolSize=threads).size()
+        max_threads = max(1, min(threads, len(src_objects)))
+        src_objects.fastmap(_copy_object, poolSize=max_threads).size()
 
     def move_prefix(self, dst_bucket: Self, src_prefix: PurePosixPath | str, dst_prefix: PurePosixPath | str = "", threads: int = 1) -> None:
         """

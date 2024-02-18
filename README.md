@@ -91,7 +91,13 @@ Contributions are welcome! If you'd like to contribute, please fork the reposito
 The code in this project is licensed under MIT license.
 
 ### Changelog
+
+##### 1.2.4
+
+- Added Windows Long name error handling in MinioBucket.fget_object()
+
 ##### 1.2.3
+
 - Fixed corner-case where IBucket.copy_prefix copies to root
 - Renamed arg dest_bucket -> dst_bucket
 

@@ -89,8 +89,23 @@ class MinioBucket(IBucket):
         return data
 
     def fget_object(self, name: PurePosixPath | str, file_path: Path) -> None:
+        """
+        Raises:
+            minio.error.S3Error(): e.code
+            RuntimeError() if the path is too long
+        """
         _name = self._validate_name(name)
-        self._minio_client.fget_object(self._bucket_name, _name, str(file_path))
+        try:
+            self._minio_client.fget_object(self._bucket_name, _name, str(file_path))
+        except FileNotFoundError as exc:
+            if os.name == "nt":
+                destination_str = str(file_path.resolve())
+                if len(destination_str) >= self.WINDOWS_MAX_PATH - self.MINIO_PATH_TEMP_SUFFIX_LEN:
+                    raise RuntimeError(
+                        "Reduce the Minio cache path length, Windows has limitation on the path length. "
+                        "More details here: https://docs.python.org/3/using/windows.html#removing-the-max-path-limitation"
+                    ) from exc
+            raise
 
     def put_object(self, name: PurePosixPath | str, content: Union[str, bytes, bytearray]) -> None:
         _content = self._encode_content(content)
