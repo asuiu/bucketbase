@@ -18,20 +18,20 @@ class MemoryBucket(IBucket):
         self._objects = {}  # Store files
         self._lock = RLock()
 
-    def put_object(self, object_name: PurePosixPath | str, content: Union[str, bytes, bytearray]) -> None:
-        _object_name = self._validate_name(object_name)
+    def put_object(self, name: PurePosixPath | str, content: Union[str, bytes, bytearray]) -> None:
+        _name = self._validate_name(name)
 
         _content = self._encode_content(content)
         with self._lock:
-            self._objects[_object_name] = _content
+            self._objects[_name] = _content
 
-    def get_object(self, object_name: PurePosixPath) -> bytes:
-        _object_name = self._validate_name(object_name)
+    def get_object(self, name: PurePosixPath) -> bytes:
+        _name = self._validate_name(name)
 
         with self._lock:
-            if _object_name not in self._objects:
-                raise FileNotFoundError(f"Object {_object_name} not found in MemoryObjectStore")
-            return self._objects[_object_name]
+            if _name not in self._objects:
+                raise FileNotFoundError(f"Object {_name} not found in MemoryObjectStore")
+            return self._objects[_name]
 
     def list_objects(self, prefix: PurePosixPath) -> slist[PurePosixPath]:
         self._split_prefix(prefix)  # validate prefix
@@ -57,13 +57,13 @@ class MemoryBucket(IBucket):
                     prefixes.add(common_prefix)
         return ShallowListing(objects=objects, prefixes=prefixes.to_list())
 
-    def exists(self, object_name: PurePosixPath | str) -> bool:
-        _object_name = self._validate_name(object_name)
+    def exists(self, name: PurePosixPath | str) -> bool:
+        _name = self._validate_name(name)
         with self._lock:
-            return _object_name in self._objects
+            return _name in self._objects
 
-    def remove_objects(self, list_of_objects: Iterable[PurePosixPath | str]) -> slist[DeleteError]:
-        _list_of_objects = [str(obj) for obj in list_of_objects]
+    def remove_objects(self, names: Iterable[PurePosixPath | str]) -> slist[DeleteError]:
+        _list_of_objects = [str(obj) for obj in names]
 
         delete_errors = slist()
         with self._lock:

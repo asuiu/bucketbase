@@ -22,10 +22,10 @@ class FSBucket(IBucket):
         assert root.is_dir(), f"root must be a directory, but got {root}"
         self._root = root
 
-    def put_object(self, object_name: PurePosixPath | str, content: Union[str, bytes, bytearray]) -> None:
-        _object_name = self._validate_name(object_name)
+    def put_object(self, name: PurePosixPath | str, content: Union[str, bytes, bytearray]) -> None:
+        _name = self._validate_name(name)
         _content = content if isinstance(content, (bytes, bytearray)) else content.encode()
-        _object_path = self._root / _object_name
+        _object_path = self._root / _name
         try:
             _object_path.parent.mkdir(parents=True, exist_ok=True)
             _object_path.write_bytes(_content)
@@ -38,12 +38,12 @@ class FSBucket(IBucket):
                     ) from exc
             raise
 
-    def get_object(self, object_name: PurePosixPath | str) -> bytes:
+    def get_object(self, name: PurePosixPath | str) -> bytes:
         """
         :raises FileNotFoundError: if the object is not found
         """
-        _object_name = self._validate_name(object_name)
-        _path = self._root / _object_name
+        _name = self._validate_name(name)
+        _path = self._root / _name
         return _path.read_bytes()
 
     def _get_recurs_listing(self, root: Path, s_prefix: str) -> slist[PurePosixPath]:
@@ -90,9 +90,9 @@ class FSBucket(IBucket):
                 raise ValueError(f"Unexpected path type: {p}")
         return ShallowListing(objects=matching_objects, prefixes=prefixes)
 
-    def exists(self, object_name: PurePosixPath | str) -> bool:
-        _object_name = self._validate_name(object_name)
-        _obj_path = self._root / _object_name
+    def exists(self, name: PurePosixPath | str) -> bool:
+        _name = self._validate_name(name)
+        _obj_path = self._root / _name
         return _obj_path.exists() and _obj_path.is_file()
 
     def _try_remove_empty_dirs(self, p):
@@ -104,7 +104,7 @@ class FSBucket(IBucket):
                 break
             dir_to_remove = dir_to_remove.parent
 
-    def remove_objects(self, list_of_objects: Iterable[PurePosixPath | str]) -> slist[DeleteError]:
+    def remove_objects(self, names: Iterable[PurePosixPath | str]) -> slist[DeleteError]:
         """
         Note: Please bear in mind that this is not concurrent safe.
         Attention!!! The removal of objects is not atomic due to sequential removal of leftover directories.
@@ -112,7 +112,7 @@ class FSBucket(IBucket):
         There's a way to make a sync version using FileLockForPath, but it will penalize the performance.
         """
         delete_errors = slist()
-        for obj in list_of_objects:
+        for obj in names:
             obj = self._validate_name(obj)
             p = self._root / obj
             try:
@@ -138,9 +138,9 @@ class AppendOnlyFSBucket(AbstractAppendOnlySynchronizedBucket):
         self._my_lock = RLock()
         self._locks_path = locks_path
 
-    def _lock_object(self, object_name: PurePosixPath | str):
-        object_name = self._validate_name(object_name)
-        lock_object_name = object_name.replace(self.SEP, "$")
+    def _lock_object(self, name: PurePosixPath | str):
+        name = self._validate_name(name)
+        lock_object_name = name.replace(self.SEP, "$")
         with self._my_lock:
             if lock_object_name in self._locks:
                 file_lock = self._locks[lock_object_name]
@@ -149,12 +149,12 @@ class AppendOnlyFSBucket(AbstractAppendOnlySynchronizedBucket):
                 self._locks[lock_object_name] = file_lock
         file_lock.acquire()
 
-    def _unlock_object(self, object_name: PurePosixPath | str):
-        object_name = self._validate_name(object_name)
-        lock_object_name = object_name.replace(self.SEP, "$")
+    def _unlock_object(self, name: PurePosixPath | str):
+        name = self._validate_name(name)
+        lock_object_name = name.replace(self.SEP, "$")
         with self._my_lock:
             if lock_object_name not in self._locks:
-                raise RuntimeError(f"Object {object_name} is not locked")
+                raise RuntimeError(f"Object {name} is not locked")
             file_lock = self._locks[lock_object_name]
             file_lock.release()
 

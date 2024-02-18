@@ -72,13 +72,13 @@ class MinioBucket(IBucket):
         self._minio_client = minio_client
         self._bucket_name = bucket_name
 
-    def get_object(self, object_name: PurePosixPath | str) -> bytes:
-        _object_name = self._validate_name(object_name)
+    def get_object(self, name: PurePosixPath | str) -> bytes:
+        _name = self._validate_name(name)
         try:
-            response = self._minio_client.get_object(self._bucket_name, _object_name)
+            response = self._minio_client.get_object(self._bucket_name, _name)
         except minio.error.S3Error as e:
             if e.code == "NoSuchKey":
-                raise FileNotFoundError(f"Object {_object_name} not found in bucket {self._bucket_name} on Minio") from e
+                raise FileNotFoundError(f"Object {_name} not found in bucket {self._bucket_name} on Minio") from e
             raise
         try:
             data = bytes()
@@ -88,19 +88,19 @@ class MinioBucket(IBucket):
             response.release_conn()
         return data
 
-    def fget_object(self, object_name: PurePosixPath | str, file_path: Path) -> None:
-        _object_name = self._validate_name(object_name)
-        self._minio_client.fget_object(self._bucket_name, _object_name, str(file_path))
+    def fget_object(self, name: PurePosixPath | str, file_path: Path) -> None:
+        _name = self._validate_name(name)
+        self._minio_client.fget_object(self._bucket_name, _name, str(file_path))
 
-    def put_object(self, object_name: PurePosixPath | str, content: Union[str, bytes, bytearray]) -> None:
+    def put_object(self, name: PurePosixPath | str, content: Union[str, bytes, bytearray]) -> None:
         _content = self._encode_content(content)
-        _object_name = self._validate_name(object_name)
+        _name = self._validate_name(name)
         f = io.BytesIO(_content)
-        self._minio_client.put_object(bucket_name=self._bucket_name, object_name=_object_name, data=f, length=len(_content))
+        self._minio_client.put_object(bucket_name=self._bucket_name, object_name=_name, data=f, length=len(_content))
 
-    def fput_object(self, object_name: PurePosixPath | str, file_path: Path) -> None:
-        _object_name = self._validate_name(object_name)
-        self._minio_client.fput_object(self._bucket_name, _object_name, str(file_path))
+    def fput_object(self, name: PurePosixPath | str, file_path: Path) -> None:
+        _name = self._validate_name(name)
+        self._minio_client.fput_object(self._bucket_name, _name, str(file_path))
 
     def list_objects(self, prefix: PurePosixPath | str) -> slist[PurePosixPath]:
         self._split_prefix(prefix)  # validate prefix
@@ -121,10 +121,10 @@ class MinioBucket(IBucket):
         objects = object_names.filter(lambda x: not x.endswith("/")).map(PurePosixPath).to_list()
         return ShallowListing(objects=objects, prefixes=prefixes)
 
-    def exists(self, object_name: PurePosixPath | str) -> bool:
-        _object_name = self._validate_name(object_name)
+    def exists(self, name: PurePosixPath | str) -> bool:
+        _name = self._validate_name(name)
         try:
-            self._minio_client.stat_object(self._bucket_name, _object_name)
+            self._minio_client.stat_object(self._bucket_name, _name)
             return True
         except minio.error.S3Error as e:
             if e.code == "NoSuchKey":
@@ -132,8 +132,8 @@ class MinioBucket(IBucket):
             logging.exception(traceback.print_exc())
             raise
 
-    def remove_objects(self, list_of_objects: Iterable[PurePosixPath | str]) -> slist[DeleteError]:
-        delete_objects_stream = stream(list_of_objects).map(self._validate_name).map(DeleteObject)
+    def remove_objects(self, names: Iterable[PurePosixPath | str]) -> slist[DeleteError]:
+        delete_objects_stream = stream(names).map(self._validate_name).map(DeleteObject)
 
         # the return value is a generator and if will not be converted to a list the deletion won't happen
         errors = slist(self._minio_client.remove_objects(self._bucket_name, delete_objects_stream))

@@ -65,9 +65,14 @@ The code in this project is licensed under MIT license.
 
 ### Changelog
 
+##### 1.2.0 (breaking changes)
+- rename all IBucket method args: object_name -> name
+- rename args: list_of_objects -> names
+
 ##### 1.1.0 (breaking changes)
 - IBucket rename: get_object_content() -> get_object()
 - IBucket.fput_oject() rename arg: destination -> file_path
+
 ##### 1.0.1
 - Added ShallowListing to __init__.py
 

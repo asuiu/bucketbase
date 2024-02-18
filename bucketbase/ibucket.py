@@ -66,39 +66,39 @@ class IBucket(PydanticValidated, ABC):
         return content if isinstance(content, (bytes, bytearray)) else content.encode(IBucket.DEFAULT_ENCODING)
 
     @staticmethod
-    def _validate_name(obj_name: PurePosixPath | str) -> str:
+    def _validate_name(name: PurePosixPath | str) -> str:
         """
         Validates the given object name.
         Throws ValueError if the object name is invalid, thus this can be used to validate the object name.
 
         Returns the object name as a string.
         """
-        if isinstance(obj_name, PurePosixPath):
-            obj_name = str(obj_name)
-        validate(IBucket.OBJ_NAME_RE.match(obj_name), f"Invalid S3 object name: {obj_name}")
-        return obj_name
+        if isinstance(name, PurePosixPath):
+            name = str(name)
+        validate(IBucket.OBJ_NAME_RE.match(name), f"Invalid S3 object name: {name}")
+        return name
 
     @abstractmethod
-    def put_object(self, object_name: PurePosixPath | str, content: Union[str, bytes, bytearray]) -> None:
+    def put_object(self, name: PurePosixPath | str, content: Union[str, bytes, bytearray]) -> None:
         raise NotImplementedError()
 
     @abstractmethod
-    def get_object(self, object_name: PurePosixPath | str) -> bytes:
+    def get_object(self, name: PurePosixPath | str) -> bytes:
         """
         :raises FileNotFoundError: if the object is not found
         """
         raise NotImplementedError()
 
-    def fput_object(self, object_name: PurePosixPath | str, file_path: Path) -> None:
+    def fput_object(self, name: PurePosixPath | str, file_path: Path) -> None:
         content = file_path.read_bytes()
-        self.put_object(object_name, content)
+        self.put_object(name, content)
 
-    def fget_object(self, object_name: PurePosixPath | str, file_path: Path) -> None:
+    def fget_object(self, name: PurePosixPath | str, file_path: Path) -> None:
         random_suffix = uuid.uuid4().hex[:8]
         tmp_file_path = file_path.parent / f"{file_path.name}.{random_suffix}.part.minio"
 
         try:
-            response = self.get_object(object_name)
+            response = self.get_object(name)
             tmp_file_path.write_bytes(response)
             if os.path.exists(file_path):
                 os.remove(file_path)  # For windows compatibility.
@@ -143,11 +143,11 @@ class IBucket(PydanticValidated, ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def exists(self, object_name: PurePosixPath | str) -> bool:
+    def exists(self, name: PurePosixPath | str) -> bool:
         raise NotImplementedError()
 
     @abstractmethod
-    def remove_objects(self, list_of_objects: Iterable[PurePosixPath | str]) -> slist[DeleteError]:
+    def remove_objects(self, names: Iterable[PurePosixPath | str]) -> slist[DeleteError]:
         """
         This does not return an error when a specified file doesn't exist in the bucket
         It's by design and is consistent with the behavior of similar APIs in Amazon S3.
@@ -165,21 +165,21 @@ class AbstractAppendOnlySynchronizedBucket(IBucket):
     def __init__(self, base_bucket: IBucket) -> None:
         self._base_bucket = base_bucket
 
-    def put_object(self, object_name: PurePosixPath | str, content: Union[str, bytes, bytearray]) -> None:
-        self._lock_object(object_name)
+    def put_object(self, name: PurePosixPath | str, content: Union[str, bytes, bytearray]) -> None:
+        self._lock_object(name)
         try:
-            self._base_bucket.put_object(object_name, content)
+            self._base_bucket.put_object(name, content)
         finally:
-            self._unlock_object(object_name)
+            self._unlock_object(name)
 
-    def get_object(self, object_name: PurePosixPath | str) -> bytes:
-        if self.exists(object_name):
-            return self._base_bucket.get_object(object_name)
-        self._lock_object(object_name)
+    def get_object(self, name: PurePosixPath | str) -> bytes:
+        if self.exists(name):
+            return self._base_bucket.get_object(name)
+        self._lock_object(name)
         try:
-            content = self._base_bucket.get_object(object_name)
+            content = self._base_bucket.get_object(name)
         finally:
-            self._unlock_object(object_name)
+            self._unlock_object(name)
         return content
 
     def list_objects(self, prefix: PurePosixPath | str) -> slist[PurePosixPath]:
@@ -188,16 +188,16 @@ class AbstractAppendOnlySynchronizedBucket(IBucket):
     def shallow_list_objects(self, prefix: PurePosixPath | str) -> ShallowListing:
         return self._base_bucket.shallow_list_objects(prefix)
 
-    def exists(self, object_name: PurePosixPath | str) -> bool:
-        return self._base_bucket.exists(object_name)
+    def exists(self, name: PurePosixPath | str) -> bool:
+        return self._base_bucket.exists(name)
 
-    def remove_objects(self, list_of_objects: Iterable[PurePosixPath | str]) -> slist[DeleteError]:
+    def remove_objects(self, names: Iterable[PurePosixPath | str]) -> slist[DeleteError]:
         raise io.UnsupportedOperation("remove_objects is not supported for AbstractAppendOnlySynchronizedBucket")
 
     @abstractmethod
-    def _lock_object(self, object_name: PurePosixPath | str):
+    def _lock_object(self, name: PurePosixPath | str):
         raise NotImplementedError()
 
     @abstractmethod
-    def _unlock_object(self, object_name: PurePosixPath | str):
+    def _unlock_object(self, name: PurePosixPath | str):
         raise NotImplementedError()
