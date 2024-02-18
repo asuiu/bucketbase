@@ -29,13 +29,13 @@ class TestCachedImmutableBucket(TestCase):
 
         # test assert raises FileNotFoundError when object is not found in the main bucket
         with self.assertRaises(FileNotFoundError):
-            self.cached_bucket.get_object_content(test_object_name)
+            self.cached_bucket.get_object(test_object_name)
 
         # put the object in the main bucket
         self.main_bucket.put_object(test_object_name, test_content)
 
         # perform the actual test
-        content = self.cached_bucket.get_object_content(test_object_name)
+        content = self.cached_bucket.get_object(test_object_name)
 
         # assert content and cache does contain the object
         self.assertEqual(content, test_content, "Content mismatch")
@@ -48,7 +48,7 @@ class TestCachedImmutableBucket(TestCase):
         self.assertFalse(self.main_bucket.exists(test_object_name), "Object found in main bucket")
 
         # assert it can be retrieved from the cached_bucket
-        self.assertEqual(self.cached_bucket.get_object_content(test_object_name), test_content, "Content mismatch")
+        self.assertEqual(self.cached_bucket.get_object(test_object_name), test_content, "Content mismatch")
 
     def test_put_object_is_blocked(self):
         with self.assertRaises(io.UnsupportedOperation):
@@ -77,7 +77,7 @@ class TestIntegratedCachedImmutableBucket(TestCase):
 
         self.assertFalse(self.cache.exists(path))
         self.assertTrue(self.storage.exists(path))
-        retrieved_content = self.storage.get_object_content(path)
+        retrieved_content = self.storage.get_object(path)
         self.assertEqual(retrieved_content, b_content)
         self.assertTrue(self.storage.exists(path))
         self.assertTrue(self.cache.exists(path))
@@ -86,9 +86,9 @@ class TestIntegratedCachedImmutableBucket(TestCase):
         self.assertEqual(list_results, [path])
         self.main.remove_objects([path])
         self.assertEqual(self.storage.list_objects(""), [])
-        self.assertRaises(FileNotFoundError, self.main.get_object_content, path)
+        self.assertRaises(FileNotFoundError, self.main.get_object, path)
 
-        retrieved_content = self.storage.get_object_content(path)
+        retrieved_content = self.storage.get_object(path)
         self.assertEqual(retrieved_content, b_content)
 
     def test_putobject(self):

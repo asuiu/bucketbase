@@ -83,14 +83,14 @@ class IBucket(PydanticValidated, ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def get_object_content(self, object_name: PurePosixPath | str) -> bytes:
+    def get_object(self, object_name: PurePosixPath | str) -> bytes:
         """
         :raises FileNotFoundError: if the object is not found
         """
         raise NotImplementedError()
 
-    def fput_object(self, object_name: PurePosixPath | str, destination: Path) -> None:
-        content = destination.read_bytes()
+    def fput_object(self, object_name: PurePosixPath | str, file_path: Path) -> None:
+        content = file_path.read_bytes()
         self.put_object(object_name, content)
 
     def fget_object(self, object_name: PurePosixPath | str, file_path: Path) -> None:
@@ -98,7 +98,7 @@ class IBucket(PydanticValidated, ABC):
         tmp_file_path = file_path.parent / f"{file_path.name}.{random_suffix}.part.minio"
 
         try:
-            response = self.get_object_content(object_name)
+            response = self.get_object(object_name)
             tmp_file_path.write_bytes(response)
             if os.path.exists(file_path):
                 os.remove(file_path)  # For windows compatibility.
@@ -172,12 +172,12 @@ class AbstractAppendOnlySynchronizedBucket(IBucket):
         finally:
             self._unlock_object(object_name)
 
-    def get_object_content(self, object_name: PurePosixPath | str) -> bytes:
+    def get_object(self, object_name: PurePosixPath | str) -> bytes:
         if self.exists(object_name):
-            return self._base_bucket.get_object_content(object_name)
+            return self._base_bucket.get_object(object_name)
         self._lock_object(object_name)
         try:
-            content = self._base_bucket.get_object_content(object_name)
+            content = self._base_bucket.get_object(object_name)
         finally:
             self._unlock_object(object_name)
         return content

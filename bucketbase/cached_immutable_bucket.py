@@ -14,11 +14,11 @@ class CachedImmutableBucket(IBucket):
         self._cache = cache
         self._main = main
 
-    def get_object_content(self, object_name: PurePosixPath | str) -> bytes:
+    def get_object(self, object_name: PurePosixPath | str) -> bytes:
         try:
-            return self._cache.get_object_content(object_name)
+            return self._cache.get_object(object_name)
         except FileNotFoundError:
-            _content = self._main.get_object_content(object_name)
+            _content = self._main.get_object(object_name)
             self._cache.put_object(object_name, _content)
             return _content
 

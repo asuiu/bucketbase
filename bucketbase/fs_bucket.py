@@ -38,7 +38,7 @@ class FSBucket(IBucket):
                     ) from exc
             raise
 
-    def get_object_content(self, object_name: PurePosixPath | str) -> bytes:
+    def get_object(self, object_name: PurePosixPath | str) -> bytes:
         """
         :raises FileNotFoundError: if the object is not found
         """

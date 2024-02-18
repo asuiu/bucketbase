@@ -72,7 +72,7 @@ class MinioBucket(IBucket):
         self._minio_client = minio_client
         self._bucket_name = bucket_name
 
-    def get_object_content(self, object_name: PurePosixPath | str) -> bytes:
+    def get_object(self, object_name: PurePosixPath | str) -> bytes:
         _object_name = self._validate_name(object_name)
         try:
             response = self._minio_client.get_object(self._bucket_name, _object_name)
@@ -98,9 +98,9 @@ class MinioBucket(IBucket):
         f = io.BytesIO(_content)
         self._minio_client.put_object(bucket_name=self._bucket_name, object_name=_object_name, data=f, length=len(_content))
 
-    def fput_object(self, object_name: PurePosixPath | str, destination: Path) -> None:
+    def fput_object(self, object_name: PurePosixPath | str, file_path: Path) -> None:
         _object_name = self._validate_name(object_name)
-        self._minio_client.fput_object(self._bucket_name, _object_name, str(destination))
+        self._minio_client.fput_object(self._bucket_name, _object_name, str(file_path))
 
     def list_objects(self, prefix: PurePosixPath | str) -> slist[PurePosixPath]:
         self._split_prefix(prefix)  # validate prefix

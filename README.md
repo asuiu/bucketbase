@@ -31,7 +31,7 @@ Memory storage is useful for tests or development environments where no persiste
 ```python
 bucket = MemoryBucket()
 bucket.put_object("test.txt", "Hello, World!")
-print(bucket.get_object_content("test.txt"))  # Outputs: b'Hello, World!'
+print(bucket.get_object("test.txt"))  # Outputs: b'Hello, World!'
 ```
 
 ### Using File Storage
@@ -40,7 +40,7 @@ File storage is useful for local development and caching.
 ```python
 bucket = FSBucket("/path/to/storage")
 bucket.put_object("hello.txt", "Hello, File Storage!")
-print(bucket.get_object_content("hello.txt"))  # Outputs: b'Hello, File Storage!'
+print(bucket.get_object("hello.txt"))  # Outputs: b'Hello, File Storage!'
 ```
 
 ### Using Minio (S3 Compatible Storage)
@@ -51,7 +51,7 @@ from bucketbase.minio_bucket import MinioBucket
 
 bucket = MinioBucket(endpoint="localhost:9000", access_key="minioadmin", secret_key="minioadmin", secure=False)
 bucket.put_object("greet.txt", "Hello, Minio!")
-print(bucket.get_object_content("greet.txt"))  # Outputs: b'Hello, Minio!'
+print(bucket.get_object("greet.txt"))  # Outputs: b'Hello, Minio!'
 ```
 
 ## Advanced Usage
@@ -63,6 +63,13 @@ Contributions are welcome! If you'd like to contribute, please fork the reposito
 ## Licensing
 The code in this project is licensed under MIT license.
 
+### Changelog
+
+##### 1.1.0 (breaking changes)
+- IBucket rename: get_object_content() -> get_object()
+- IBucket.fput_oject() rename arg: destination -> file_path
+##### 1.0.1
+- Added ShallowListing to __init__.py
 
 ---
 This README.md provides a general overview of BucketBase, instructions for installation, a quick start guide for using its various storage options, and an invitation for contributions. It's structured to be informative and straightforward, allowing users to quickly get started with the project.

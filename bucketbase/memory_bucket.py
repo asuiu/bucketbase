@@ -25,7 +25,7 @@ class MemoryBucket(IBucket):
         with self._lock:
             self._objects[_object_name] = _content
 
-    def get_object_content(self, object_name: PurePosixPath) -> bytes:
+    def get_object(self, object_name: PurePosixPath) -> bytes:
         _object_name = self._validate_name(object_name)
 
         with self._lock:

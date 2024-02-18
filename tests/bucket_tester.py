@@ -28,33 +28,33 @@ class IBucketTester:
         path = PurePosixPath(f"{unique_dir}/file1.bin")
         b_content = b"Test content"
         self.storage.put_object(path, b_content)
-        retrieved_content = self.storage.get_object_content(path)
+        retrieved_content = self.storage.get_object(path)
         self.test_case.assertEqual(retrieved_content, b_content)
 
         # str content
         path = PurePosixPath(f"{unique_dir}/file1.txt")
         s_content = "Test content"
         self.storage.put_object(path, s_content)
-        retrieved_content = self.storage.get_object_content(path)
+        retrieved_content = self.storage.get_object(path)
         self.test_case.assertEqual(retrieved_content, bytes(s_content, "utf-8"))
 
         # bytearray content
         path = PurePosixPath(f"{unique_dir}/file1.ba")
         ba_content = bytearray(b"Test content")
         self.storage.put_object(path, ba_content)
-        retrieved_content = self.storage.get_object_content(path)
+        retrieved_content = self.storage.get_object(path)
         self.test_case.assertEqual(retrieved_content, b_content)
 
         # string path
         path = f"{unique_dir}/file1.txt"
         s_content = "Test content"
         self.storage.put_object(path, s_content)
-        retrieved_content = self.storage.get_object_content(path)
+        retrieved_content = self.storage.get_object(path)
         self.test_case.assertEqual(retrieved_content, bytes(s_content, "utf-8"))
 
         # inexistent path
         path = f"{unique_dir}/inexistent.txt"
-        self.test_case.assertRaises(FileNotFoundError, self.storage.get_object_content, path)
+        self.test_case.assertRaises(FileNotFoundError, self.storage.get_object, path)
 
     def test_list_objects(self):
         unique_dir = f"dir{self.us}"
@@ -128,7 +128,7 @@ class IBucketTester:
         self.test_case.assertEqual(result, [])
         self.test_case.assertFalse(self.storage.exists(path1))
         self.test_case.assertFalse(self.storage.exists(path2))
-        self.test_case.assertRaises(FileNotFoundError, self.storage.get_object_content, f"{unique_dir}/file1.txt")
+        self.test_case.assertRaises(FileNotFoundError, self.storage.get_object, f"{unique_dir}/file1.txt")
         self.test_case.assertRaises(ValueError, self.storage.remove_objects, [f"{unique_dir}/"])
 
         # check that the leftover empty directories are also removed
