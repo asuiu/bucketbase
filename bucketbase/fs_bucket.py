@@ -123,6 +123,10 @@ class FSBucket(IBucket):
                 self._try_remove_empty_dirs(p)
         return delete_errors
 
+    def get_root(self) -> Path:
+        """ This is not part of the IBucket interface, but it's useful for multiple purposes. """
+        return self._root
+
 
 class AppendOnlyFSBucket(AbstractAppendOnlySynchronizedBucket):
     """
