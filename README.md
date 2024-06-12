@@ -92,6 +92,9 @@ The code in this project is licensed under MIT license.
 
 ### Changelog
 
+##### 1.3.0
+- Added streaming capability: IBucket.put_object_stream() & IBucket.get_object_stream()
+
 ##### 1.2.4
 
 - Added Windows Long name error handling in MinioBucket.fget_object()

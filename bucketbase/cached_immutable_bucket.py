@@ -1,12 +1,12 @@
 import io
 from pathlib import Path, PurePosixPath
-from typing import Iterable, Union
+from typing import Iterable, Union, BinaryIO
 
 from streamerate import slist
 
 from bucketbase.errors import DeleteError
 from bucketbase.fs_bucket import AppendOnlyFSBucket
-from bucketbase.ibucket import ShallowListing, IBucket
+from bucketbase.ibucket import ShallowListing, IBucket, ObjectStream
 
 
 class CachedImmutableBucket(IBucket):
@@ -22,8 +22,19 @@ class CachedImmutableBucket(IBucket):
             self._cache.put_object(name, _content)
             return _content
 
+    def get_object_stream(self, name: PurePosixPath | str) -> ObjectStream:
+        try:
+            return self._cache.get_object_stream(name)
+        except FileNotFoundError:
+            with self._main.get_object_stream(name) as stream:
+                self._cache.put_object_stream(name, stream)
+            return self._cache.get_object_stream(name)
+
     def put_object(self, name: PurePosixPath | str, content: Union[str, bytes, bytearray]) -> None:
         raise io.UnsupportedOperation("put_object is not supported for CachedImmutableMinioObjectStorage")
+
+    def put_object_stream(self, name: PurePosixPath | str, stream: BinaryIO) -> None:
+        raise io.UnsupportedOperation("put_object_stream is not supported for CachedImmutableMinioObjectStorage")
 
     def list_objects(self, prefix: PurePosixPath | str = "") -> slist[PurePosixPath]:
         return self._main.list_objects(prefix)

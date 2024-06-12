@@ -1,3 +1,5 @@
+import gzip
+from io import BytesIO
 from pathlib import PurePosixPath
 from unittest import TestCase
 
@@ -55,6 +57,34 @@ class IBucketTester:
         # inexistent path
         path = f"{unique_dir}/inexistent.txt"
         self.test_case.assertRaises(FileNotFoundError, self.storage.get_object, path)
+
+    def test_put_and_get_object_stream(self):
+        unique_dir = f"dir{self.us}"
+        # binary content
+        path = PurePosixPath(f"{unique_dir}/file1.bin")
+        b_content = b"Test\ncontent"
+        b_gzipped_content = gzip.compress(b_content)
+        gzipped_stream = BytesIO(b_gzipped_content)
+
+        self.storage.put_object_stream(path, gzipped_stream)
+
+        retrieved_content_stream = self.storage.get_object_stream(path)
+        with retrieved_content_stream as file:
+            with gzip.open(file, 'rt') as file:
+                result = [file.readline() for _ in range(3)]
+        self.test_case.assertEqual(result, ['Test\n', 'content', ''])
+
+        # string path
+        path = f"{unique_dir}/file1.bin"
+        retrieved_content = self.storage.get_object_stream(path)
+        with retrieved_content as file:
+            with gzip.open(file, 'rt') as file:
+                result = file.read()
+        self.test_case.assertEqual(result, "Test\ncontent")
+
+        # inexistent path
+        path = f"{unique_dir}/inexistent.txt"
+        self.test_case.assertRaises(FileNotFoundError, self.storage.get_object_stream, path)
 
     def test_list_objects(self):
         unique_dir = f"dir{self.us}"

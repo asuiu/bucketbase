@@ -1,19 +1,36 @@
 import os
+from io import BytesIO
 from pathlib import Path, PurePosixPath
 from threading import RLock
-from typing import Dict, Iterable, Optional, Union
+from typing import Dict, Iterable, Optional, Union, BinaryIO
 
 from streamerate import slist
 
 from bucketbase.errors import DeleteError
 from bucketbase.file_lock import FileLockForPath
-from bucketbase.ibucket import ShallowListing, IBucket, AbstractAppendOnlySynchronizedBucket
+from bucketbase.ibucket import ShallowListing, IBucket, AbstractAppendOnlySynchronizedBucket, ObjectStream
+
+
+class FSObjectStream(ObjectStream):
+    def __init__(self, path: Path, name: PurePosixPath) -> None:
+        self._path = path
+        self._name = name
+        self._file = None
+
+    def __enter__(self) -> BinaryIO:
+        self._file = self._path.open("rb")
+        return self._file
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        self._file.close()
+        self._file = None
 
 
 class FSBucket(IBucket):
     """
     Implements IObjectStorage interface, but stores all objects in local-mounted filesystem.
     """
+    BUFFER_SIZE = 64 * 1024
 
     def __init__(self, root: Path) -> None:
         assert isinstance(root, Path), f"root must be a Path, but got {type(root)}"
@@ -23,12 +40,20 @@ class FSBucket(IBucket):
         self._root = root
 
     def put_object(self, name: PurePosixPath | str, content: Union[str, bytes, bytearray]) -> None:
+        stream = BytesIO(content) if isinstance(content, (bytes, bytearray)) else BytesIO(content.encode())
+        self.put_object_stream(name, stream)
+
+    def put_object_stream(self, name: PurePosixPath | str, stream: BinaryIO) -> None:
         _name = self._validate_name(name)
-        _content = content if isinstance(content, (bytes, bytearray)) else content.encode()
         _object_path = self._root / _name
         try:
             _object_path.parent.mkdir(parents=True, exist_ok=True)
-            _object_path.write_bytes(_content)
+            with _object_path.open("wb") as f:
+                while True:
+                    chunk = stream.read(self.BUFFER_SIZE)
+                    if not chunk:
+                        break
+                    f.write(chunk)
         except FileNotFoundError as exc:
             if os.name == "nt":
                 if len(str(_object_path)) >= self.WINDOWS_MAX_PATH - self.MINIO_PATH_TEMP_SUFFIX_LEN:
@@ -45,6 +70,13 @@ class FSBucket(IBucket):
         _name = self._validate_name(name)
         _path = self._root / _name
         return _path.read_bytes()
+
+    def get_object_stream(self, name: PurePosixPath | str) -> ObjectStream:
+        _name = self._validate_name(name)
+        fpath = self._root / _name
+        if not fpath.exists() or not fpath.is_file():
+            raise FileNotFoundError(f"Object {_name} not found in FSBucket")
+        return FSObjectStream(fpath, PurePosixPath(name))
 
     def _get_recurs_listing(self, root: Path, s_prefix: str) -> slist[PurePosixPath]:
         listing = root.rglob("*")

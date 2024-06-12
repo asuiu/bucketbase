@@ -1,11 +1,12 @@
+import io
 from pathlib import PurePosixPath
 from threading import RLock
-from typing import Iterable, Union
+from typing import Iterable, Union, BinaryIO
 
 from streamerate import slist, sset, stream
 
 from bucketbase import DeleteError
-from bucketbase.ibucket import ShallowListing, IBucket
+from bucketbase.ibucket import ShallowListing, IBucket, ObjectStream
 
 
 class MemoryBucket(IBucket):
@@ -25,6 +26,10 @@ class MemoryBucket(IBucket):
         with self._lock:
             self._objects[_name] = _content
 
+    def put_object_stream(self, name: PurePosixPath | str, stream: BinaryIO) -> None:
+        _content = stream.read()
+        self.put_object(name, _content)
+
     def get_object(self, name: PurePosixPath | str) -> bytes:
         _name = self._validate_name(name)
 
@@ -32,6 +37,10 @@ class MemoryBucket(IBucket):
             if _name not in self._objects:
                 raise FileNotFoundError(f"Object {_name} not found in MemoryObjectStore")
             return self._objects[_name]
+
+    def get_object_stream(self, name: PurePosixPath | str) -> ObjectStream:
+        content = self.get_object(name)
+        return ObjectStream(io.BytesIO(content), PurePosixPath(name))
 
     def list_objects(self, prefix: PurePosixPath | str = "") -> slist[PurePosixPath]:
         self._split_prefix(prefix)  # validate prefix

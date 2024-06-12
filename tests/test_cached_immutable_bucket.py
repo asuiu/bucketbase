@@ -91,6 +91,37 @@ class TestIntegratedCachedImmutableBucket(TestCase):
         retrieved_content = self.storage.get_object(path)
         self.assertEqual(retrieved_content, b_content)
 
+    def test_get_object_stream_happy_path(self):
+        """
+        Here we test that the object is retrieved from the main storage, and then cached into the cache.
+        We test that initially the object is not in the cache, but it is in the main storage.
+        Then we retrieve the object, and check that it is in the cache.
+        Then we remove the object from the main storage, and check that it is still in the cache, and that it can be retrieved from the storage in test.
+        """
+        unique_dir = f"dir{self.tester.us}"
+        # binary content
+        path = PurePosixPath(f"{unique_dir}/file1.bin")
+        b_content = b"Test content"
+        self.main.put_object(path, b_content)
+
+        self.assertFalse(self.cache.exists(path))
+        self.assertTrue(self.storage.exists(path))
+        with self.storage.get_object_stream(path) as stream:
+            retrieved_content = stream.read()
+        self.assertEqual(retrieved_content, b_content)
+        self.assertTrue(self.storage.exists(path))
+        self.assertTrue(self.cache.exists(path))
+
+        list_results = self.storage.list_objects("")
+        self.assertEqual(list_results, [path])
+        self.main.remove_objects([path])
+        self.assertEqual(self.storage.list_objects(""), [])
+        self.assertRaises(FileNotFoundError, self.main.get_object, path)
+
+        with self.storage.get_object_stream(path) as stream:
+            retrieved_content = stream.read()
+        self.assertEqual(retrieved_content, b_content)
+
     def test_putobject(self):
         self.assertRaises(io.UnsupportedOperation, self.storage.put_object, "test", "test")
 

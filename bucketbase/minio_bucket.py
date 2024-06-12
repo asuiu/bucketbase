@@ -3,7 +3,7 @@ import logging
 import os
 import traceback
 from pathlib import Path, PurePosixPath
-from typing import Iterable, Union
+from typing import Iterable, Union, BinaryIO
 
 import certifi
 import minio
@@ -13,8 +13,23 @@ from minio.datatypes import Object
 from minio.deleteobjects import DeleteError, DeleteObject
 from multiminio import MultiMinio
 from streamerate import slist, stream
+from urllib3 import HTTPResponse
 
-from bucketbase.ibucket import ShallowListing, IBucket
+from bucketbase.ibucket import ShallowListing, IBucket, ObjectStream
+
+
+class MinioObjectStream(ObjectStream):
+    def __init__(self, response: HTTPResponse, object_name: PurePosixPath) -> None:
+        super().__init__(response, object_name)
+        self._response = response
+        self._size = int(response.headers.get('content-length', -1))
+
+    def __enter__(self) -> ObjectStream:
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        self._response.close()
+        self._response.release_conn()
 
 
 def build_minio_client(endpoints: str,
@@ -68,6 +83,8 @@ def build_minio_client(endpoints: str,
 
 
 class MinioBucket(IBucket):
+    PART_SIZE = 5 * 1024 * 1024
+
     def __init__(self, bucket_name: str, minio_client: Minio) -> None:
         self._minio_client = minio_client
         self._bucket_name = bucket_name
@@ -87,6 +104,11 @@ class MinioBucket(IBucket):
         finally:
             response.release_conn()
         return data
+
+    def get_object_stream(self, name: PurePosixPath | str) -> ObjectStream:
+        _name = self._validate_name(name)
+        response = self._minio_client.get_object(self._bucket_name, _name)
+        return MinioObjectStream(response, name)
 
     def fget_object(self, name: PurePosixPath | str, file_path: Path) -> None:
         """
@@ -112,6 +134,10 @@ class MinioBucket(IBucket):
         _name = self._validate_name(name)
         f = io.BytesIO(_content)
         self._minio_client.put_object(bucket_name=self._bucket_name, object_name=_name, data=f, length=len(_content))
+
+    def put_object_stream(self, name: PurePosixPath | str, stream: BinaryIO) -> None:
+        _name = self._validate_name(name)
+        self._minio_client.put_object(bucket_name=self._bucket_name, object_name=_name, data=stream, length=-1, part_size=self.PART_SIZE)
 
     def fput_object(self, name: PurePosixPath | str, file_path: Path) -> None:
         _name = self._validate_name(name)

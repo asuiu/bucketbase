@@ -17,6 +17,9 @@ class TestIntegratedMinioBucket(TestCase):
     def test_put_and_get_object(self):
         self.tester.test_put_and_get_object()
 
+    def test_put_and_get_object_stream(self):
+        self.tester.test_put_and_get_object_stream()
+
     def test_list_objects(self):
         self.tester.test_list_objects()
 

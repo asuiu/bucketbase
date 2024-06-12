@@ -5,7 +5,7 @@ import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import PurePosixPath, Path
-from typing import Tuple, Optional, Union, Iterable
+from typing import Tuple, Optional, Union, Iterable, BinaryIO
 
 from pyxtension import PydanticValidated, validate
 from pyxtension.models import ImmutableExtModel
@@ -29,6 +29,16 @@ class ShallowListing(ImmutableExtModel):
     objects: slist[PurePosixPath]
     prefixes: slist[str]
 
+class ObjectStream:
+    def __init__(self, stream: BinaryIO, name: PurePosixPath) -> None:
+        self._stream = stream
+        self._name = name
+
+    def __enter__(self) -> BinaryIO:
+        return self._stream
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        self._stream.close()
 
 class IBucket(PydanticValidated, ABC):
     """
@@ -90,7 +100,18 @@ class IBucket(PydanticValidated, ABC):
         raise NotImplementedError()
 
     @abstractmethod
+    def put_object_stream(self, name: PurePosixPath | str, stream: BinaryIO) -> None:
+        raise NotImplementedError()
+
+    @abstractmethod
     def get_object(self, name: PurePosixPath | str) -> bytes:
+        """
+        :raises FileNotFoundError: if the object is not found
+        """
+        raise NotImplementedError()
+
+    @abstractmethod
+    def get_object_stream(self, name: PurePosixPath | str) -> ObjectStream:
         """
         :raises FileNotFoundError: if the object is not found
         """
@@ -209,6 +230,13 @@ class AbstractAppendOnlySynchronizedBucket(IBucket):
         finally:
             self._unlock_object(name)
 
+    def put_object_stream(self, name: PurePosixPath | str, stream: BinaryIO) -> None:
+        self._lock_object(name)
+        try:
+            self._base_bucket.put_object_stream(name, stream)
+        finally:
+            self._unlock_object(name)
+
     def get_object(self, name: PurePosixPath | str) -> bytes:
         if self.exists(name):
             return self._base_bucket.get_object(name)
@@ -218,6 +246,16 @@ class AbstractAppendOnlySynchronizedBucket(IBucket):
         finally:
             self._unlock_object(name)
         return content
+
+    def get_object_stream(self, name: PurePosixPath | str) -> ObjectStream:
+        if self.exists(name):
+            return self._base_bucket.get_object_stream(name)
+        self._lock_object(name)
+        try:
+            stream = self._base_bucket.get_object_stream(name)
+        finally:
+            self._unlock_object(name)
+        return stream
 
     def list_objects(self, prefix: PurePosixPath | str = "") -> slist[PurePosixPath]:
         return self._base_bucket.list_objects(prefix)
