@@ -25,7 +25,7 @@ class MinioObjectStream(ObjectStream):
         self._size = int(response.headers.get('content-length', -1))
 
     def __enter__(self) -> ObjectStream:
-        return self
+        return self._response
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         self._response.close()
@@ -90,6 +90,17 @@ class MinioBucket(IBucket):
         self._bucket_name = bucket_name
 
     def get_object(self, name: PurePosixPath | str) -> bytes:
+        with self.get_object_stream(name) as response:
+            try:
+                data = bytes()
+                for buffer in response.stream(amt=1024 * 1024):
+                    data += buffer
+                return data
+            finally:
+                response.release_conn()
+
+
+    def get_object_stream(self, name: PurePosixPath | str) -> ObjectStream:
         _name = self._validate_name(name)
         try:
             response = self._minio_client.get_object(self._bucket_name, _name)
@@ -97,17 +108,7 @@ class MinioBucket(IBucket):
             if e.code == "NoSuchKey":
                 raise FileNotFoundError(f"Object {_name} not found in bucket {self._bucket_name} on Minio") from e
             raise
-        try:
-            data = bytes()
-            for buffer in response.stream(amt=1024 * 1024):
-                data += buffer
-        finally:
-            response.release_conn()
-        return data
 
-    def get_object_stream(self, name: PurePosixPath | str) -> ObjectStream:
-        _name = self._validate_name(name)
-        response = self._minio_client.get_object(self._bucket_name, _name)
         return MinioObjectStream(response, name)
 
     def fget_object(self, name: PurePosixPath | str, file_path: Path) -> None:

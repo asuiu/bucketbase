@@ -67,9 +67,7 @@ class IBucketTester:
         gzipped_stream = BytesIO(b_gzipped_content)
 
         self.storage.put_object_stream(path, gzipped_stream)
-
-        retrieved_content_stream = self.storage.get_object_stream(path)
-        with retrieved_content_stream as file:
+        with self.storage.get_object_stream(path) as file:
             with gzip.open(file, 'rt') as file:
                 result = [file.readline() for _ in range(3)]
         self.test_case.assertEqual(result, ['Test\n', 'content', ''])
@@ -161,6 +159,7 @@ class IBucketTester:
         self.test_case.assertRaises(FileNotFoundError, self.storage.get_object, f"{unique_dir}/file1.txt")
         self.test_case.assertRaises(ValueError, self.storage.remove_objects, [f"{unique_dir}/"])
 
-        # check that the leftover empty directories are also removed
+        # check that the leftover empty directories are also removed, but bucket may contain leftovers from the other test runs
         shallow_listing = self.storage.shallow_list_objects("")
-        self.test_case.assertEqual(shallow_listing, ShallowListing(objects=slist(), prefixes=slist()))
+        prefixes = shallow_listing.prefixes.toSet()
+        self.test_case.assertNotIn(f"{unique_dir}/", prefixes)
