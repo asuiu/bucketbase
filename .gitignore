@@ -1,5 +1,5 @@
 # Byte-compiled / optimized / DLL files
-__pycache__/
+python/__pycache__/
 *.py[cod]
 *$py.class
 
@@ -7,24 +7,24 @@ __pycache__/
 *.so
 
 # Distribution / packaging
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-share/python-wheels/
+python/.Python
+python/build/
+python/develop-eggs/
+python/dist/
+python/downloads/
+python/eggs/
+python/.eggs/
+python/lib/
+python/lib64/
+python/parts/
+python/sdist/
+python/var/
+python/wheels/
+python/share/python-wheels/
 *.egg-info/
-.installed.cfg
+python/.installed.cfg
 *.egg
-MANIFEST
+python/MANIFEST
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
@@ -33,23 +33,23 @@ MANIFEST
 *.spec
 
 # Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
+python/pip-log.txt
+python/pip-delete-this-directory.txt
 
 # Unit test / coverage reports
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
+python/htmlcov/
+python/.tox/
+python/.nox/
+python/.coverage
+python/.coverage.*
+python/.cache
+python/nosetests.xml
+python/coverage.xml
 *.cover
 *.py,cover
-.hypothesis/
-.pytest_cache/
-cover/
+python/.hypothesis/
+python/.pytest_cache/
+python/cover/
 
 # Translations
 *.mo
@@ -120,37 +120,37 @@ celerybeat.pid
 *.sage.py
 
 # Environments
-.env
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
+python/.env
+python/.venv
+python/env/
+python/venv/
+python/ENV/
+python/env.bak/
+python/venv.bak/
 
 # Spyder project settings
-.spyderproject
-.spyproject
+python/.spyderproject
+python/.spyproject
 
 # Rope project settings
-.ropeproject
+python/.ropeproject
 
 # mkdocs documentation
-/site
+python/site
 
 # mypy
-.mypy_cache/
-.dmypy.json
-dmypy.json
+python/.mypy_cache/
+python/.dmypy.json
+python/dmypy.json
 
 # Pyre type checker
-.pyre/
+python/.pyre/
 
 # pytype static type analyzer
-.pytype/
+python/.pytype/
 
 # Cython debug symbols
-cython_debug/
+python/cython_debug/
 
 # PyCharm
 #  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
@@ -160,3 +160,49 @@ cython_debug/
 .idea/
 
 **/local_config.py
+python/**/local_config.py
+
+
+## Java .gitignore
+.gradle
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### IntelliJ IDEA ###
+.idea/modules.xml
+.idea/jarRepositories.xml
+.idea/compiler.xml
+.idea/libraries/
+*.iws
+*.iml
+*.ipr
+out/
+!**/src/main/**/out/
+!**/src/test/**/out/
+
+### Eclipse ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+bin/
+!**/src/main/**/bin/
+!**/src/test/**/bin/
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+### VS Code ###
+.vscode/
+
+### Mac OS ###
+.DS_Store

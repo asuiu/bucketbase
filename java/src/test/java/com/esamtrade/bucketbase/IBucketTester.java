@@ -1,0 +1,197 @@
+package com.esamtrade.bucketbase;
+
+import java.io.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+public class IBucketTester {
+
+    private static final List<String> INVALID_PREFIXES = List.of("/", "/dir", "star*1", "dir1/a\\file.txt", "at@gmail", "sharp#1", "dollar$1", "comma,");
+    private final BaseBucket storage;
+    private final String uniqueSuffix;
+
+    public IBucketTester(BaseBucket storage) {
+        this.storage = storage;
+        // Generate a unique suffix to be used in the names of dirs and files
+        this.uniqueSuffix = String.format("%08d", System.currentTimeMillis() % 100_000_000);
+    }
+
+    public void cleanup() throws IOException {
+        storage.removePrefix(PurePosixPath.from("dir" + uniqueSuffix));
+    }
+
+    public void testPutAndGetObject() throws IOException {
+        String uniqueDir = "dir" + uniqueSuffix;
+
+        // Binary content
+        PurePosixPath path = PurePosixPath.from(uniqueDir, "file1.bin");
+
+        byte[] bContent = "Test content".getBytes();
+        storage.putObject(path, bContent);
+        byte[] retrievedContent = storage.getObject(path);
+        assertArrayEquals(retrievedContent, bContent);
+
+        // String content
+        path = PurePosixPath.from(uniqueDir, "file1.txt");
+        String sContent = "Test content";
+        storage.putObject(path, sContent.getBytes());
+        retrievedContent = storage.getObject(path);
+        assertArrayEquals(retrievedContent, sContent.getBytes("utf-8"));
+
+        // ByteArray content
+        path = PurePosixPath.from(uniqueDir, "file1.ba");
+        byte[] baContent = "Test content".getBytes();
+        storage.putObject(path, baContent);
+        retrievedContent = storage.getObject(path);
+        assertArrayEquals(retrievedContent, baContent);
+
+        // String path
+        String stringPath = uniqueDir + "/file1.txt";
+        storage.putObject(PurePosixPath.from(stringPath), sContent.getBytes());
+        retrievedContent = storage.getObject(PurePosixPath.from(stringPath));
+        assertArrayEquals(retrievedContent, sContent.getBytes("utf-8"));
+
+        // Non-existent path
+        PurePosixPath nonExistentPath = PurePosixPath.from(uniqueDir, "inexistent.txt");
+        assertThrows(FileNotFoundException.class, () -> storage.getObject(nonExistentPath), "Expected exception not thrown for non-existent path");
+    }
+
+    public void testPutAndGetObjectStream() throws IOException {
+        String uniqueDir = "dir" + uniqueSuffix;
+
+        // Binary content
+        PurePosixPath path = PurePosixPath.from(uniqueDir, "file1.bin");
+        byte[] bContent = "Test\ncontent".getBytes();
+        ByteArrayOutputStream byteStream = new ByteArrayOutputStream();
+        try (GZIPOutputStream gzipOut = new GZIPOutputStream(byteStream)) {
+            gzipOut.write(bContent);
+        }
+        ByteArrayInputStream gzippedStream = new ByteArrayInputStream(byteStream.toByteArray());
+
+        storage.putObjectStream(path, gzippedStream);
+        try (ObjectStream file = storage.getObjectStream(path)) {
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(new GZIPInputStream(file.getStream())))) {
+                String[] result = new String[3];
+                for (int i = 0; i < 3; i++) {
+                    result[i] = reader.readLine();
+                }
+                assertArrayEquals(new String[]{"Test", "content", null}, result);
+            }
+        }
+
+        // String path
+        path = PurePosixPath.from(uniqueDir, "file1.bin");
+        try (ObjectStream file = storage.getObjectStream(path)) {
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(new GZIPInputStream(file.getStream())))) {
+                char[] cbuf = new char[100];
+                int readCount = reader.read(cbuf, 0, 100);
+                String result = new String(cbuf, 0, readCount);
+                assertEquals("Test\ncontent", result);
+            }
+        }
+
+        // Non-existent path
+        PurePosixPath nonExistentPath = PurePosixPath.from(uniqueDir, "inexistent.txt");
+        assertThrows(FileNotFoundException.class, () -> storage.getObjectStream(nonExistentPath));
+    }
+
+    public void testListObjects() throws IOException {
+        String uniqueDir = "dir" + uniqueSuffix;
+        storage.putObject(PurePosixPath.from(uniqueDir, "file1.txt"), "Content 1".getBytes());
+        storage.putObject(PurePosixPath.from(uniqueDir, "dir2/file2.txt"), "Content 2".getBytes());
+        storage.putObject(PurePosixPath.from(uniqueDir + "file1.txt"), "Content 3".getBytes());
+
+        List<PurePosixPath> objects = storage.listObjects(PurePosixPath.from(uniqueDir));
+        Collections.sort(objects);
+        assertTrue(objects instanceof ArrayList);
+        List<PurePosixPath> expectedObjects = List.of(
+                PurePosixPath.from(uniqueDir, "dir2/file2.txt"),
+                PurePosixPath.from(uniqueDir, "file1.txt"),
+                PurePosixPath.from(uniqueDir + "file1.txt")
+                                                     );
+        assertEquals(expectedObjects, objects);
+
+        objects = storage.listObjects(PurePosixPath.from(uniqueDir + "/"));
+        Collections.sort(objects);
+        assertTrue(objects instanceof ArrayList);
+        expectedObjects = List.of(
+                PurePosixPath.from(uniqueDir, "dir2/file2.txt"),
+                PurePosixPath.from(uniqueDir, "file1.txt")
+                                 );
+        assertEquals(expectedObjects, objects);
+
+        // Invalid Prefix cases
+        for (String prefix : INVALID_PREFIXES) {
+            assertThrows(IllegalArgumentException.class, () -> storage.listObjects(PurePosixPath.from(prefix)), "Invalid prefix: " + prefix);
+        }
+    }
+
+    public void testShallowListObjects() throws IOException {
+        String uniqueDir = "dir" + uniqueSuffix;
+        storage.putObject(new PurePosixPath(uniqueDir + "/file1.txt"), "Content 1".getBytes());
+        storage.putObject(new PurePosixPath(uniqueDir + "/dir2/file2.txt"), "Content 2".getBytes());
+        storage.putObject(new PurePosixPath(uniqueDir + "file1.txt"), "Content 3".getBytes());
+
+        assertThrows(IllegalArgumentException.class, () -> storage.shallowListObjects(new PurePosixPath("/")));
+        assertThrows(IllegalArgumentException.class, () -> storage.shallowListObjects(new PurePosixPath("/d")));
+
+        ShallowListing objects = storage.shallowListObjects(new PurePosixPath(uniqueDir + "/"));
+        List<PurePosixPath> expectedObjects = List.of(PurePosixPath.from(uniqueDir + "/file1.txt"));
+        List<PurePosixPath> expectedPrefixes = List.of(PurePosixPath.from(uniqueDir + "/dir2/"));
+        assertIterableEquals(expectedObjects, objects.getObjects());
+        assertIterableEquals(expectedPrefixes, objects.getPrefixes());
+
+        ShallowListing shallowListing = storage.shallowListObjects(new PurePosixPath(uniqueDir));
+        expectedObjects = List.of(new PurePosixPath(uniqueDir + "file1.txt"));
+        expectedPrefixes = List.of(PurePosixPath.from(uniqueDir + "/"));
+        assertTrue(shallowListing.getObjects() instanceof List);
+        assertTrue(shallowListing.getPrefixes() instanceof List);
+        assertIterableEquals(expectedObjects, shallowListing.getObjects());
+        assertIterableEquals(expectedPrefixes, shallowListing.getPrefixes());
+
+        // Invalid Prefix cases
+        for (String prefix : INVALID_PREFIXES) {
+            assertThrows(IllegalArgumentException.class, () -> storage.shallowListObjects(new PurePosixPath(prefix)));
+        }
+    }
+
+    public void testExists() throws IOException {
+        String uniqueDir = "dir" + uniqueSuffix;
+        PurePosixPath path = new PurePosixPath(uniqueDir + "/file.txt");
+        storage.putObject(path, "Content".getBytes());
+
+        assertTrue(storage.exists(path));
+        assertFalse(storage.exists(new PurePosixPath(uniqueDir)));
+        assertThrows(IllegalArgumentException.class, () -> storage.exists(new PurePosixPath(uniqueDir + "/")));
+    }
+
+    public void testRemoveObjects() throws IOException {
+        // Setup the test
+        String uniqueDir = "dir" + uniqueSuffix;
+        PurePosixPath path1 = new PurePosixPath(uniqueDir + "/file1.txt");
+        PurePosixPath path2 = new PurePosixPath(uniqueDir + "/file2.txt");
+        storage.putObject(path1, "Content 1".getBytes());
+        storage.putObject(path2, "Content 2".getBytes());
+
+        // Perform removal action
+        List<DeleteError> result = storage.removeObjects(List.of(path1, path2, new PurePosixPath(uniqueDir + "/inexistent.file")));
+
+        // Check that the files do not exist
+        assertTrue(result instanceof List);
+        assertEquals(List.of(), result);
+        assertFalse(storage.exists(path1));
+        assertFalse(storage.exists(path2));
+        assertThrows(FileNotFoundException.class, () -> storage.getObject(new PurePosixPath(uniqueDir + "/file1.txt")));
+        assertThrows(IllegalArgumentException.class, () -> storage.removeObjects(List.of(new PurePosixPath(uniqueDir + "/"))));
+
+        // Check that the leftover empty directories are also removed, but the bucket may contain leftovers from the other test runs
+        ShallowListing shallowListing = storage.shallowListObjects(new PurePosixPath(""));
+        List<PurePosixPath> prefixes = shallowListing.getPrefixes();
+        assertFalse(prefixes.contains(uniqueDir + "/"));
+    }
+}
