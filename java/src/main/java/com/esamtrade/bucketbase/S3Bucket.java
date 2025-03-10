@@ -1,5 +1,6 @@
 package com.esamtrade.bucketbase;
 
+import org.apache.commons.codec.digest.DigestUtils;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.core.async.AsyncRequestBody;
@@ -14,9 +15,6 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
@@ -238,7 +236,7 @@ public class S3Bucket extends BaseBucket {
      * can result in a `400 Bad Request` error indicating a missing `Content-Md5` header.
      *
      * <p>This ensures compatibility with MinIO and similar services that enforce the presence of the `Content-MD5` header.
-     * More info: https://docs.aws.amazon.com/AmazonS3/latest/API/API_DeleteObjects.html
+     * <a href="https://docs.aws.amazon.com/AmazonS3/latest/API/API_DeleteObjects.html">More info</a>
      *
      * @param names List of object paths to be removed.
      * @return List of errors encountered during the deletion process.
@@ -280,14 +278,8 @@ public class S3Bucket extends BaseBucket {
                     String xmlPayload = xmlBuilder.toString();
 
                     // Compute MD5 checksum
-                    String contentMd5;
-                    try {
-                        MessageDigest md = MessageDigest.getInstance("MD5");
-                        byte[] md5Bytes = md.digest(xmlPayload.getBytes(StandardCharsets.UTF_8));
-                        contentMd5 = Base64.getEncoder().encodeToString(md5Bytes);
-                    } catch (NoSuchAlgorithmException e2) {
-                        throw new RuntimeException("MD5 algorithm not found", e2);
-                    }
+                    byte[] md5Bytes = DigestUtils.md5(xmlPayload);
+                    String contentMd5 = Base64.getEncoder().encodeToString(md5Bytes);
 
                     // Create Delete object
                     Delete delete = Delete.builder().objects(keys).build();

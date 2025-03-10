@@ -39,6 +39,11 @@ test {
     useJUnitPlatform()
 }
 
+tasks.register("sourceJar", Jar) {
+    from sourceSets.main.allSource
+    archiveClassifier.set("sources")
+}
+
 publishing {
     publications {
         esamLibrary(MavenPublication) {
