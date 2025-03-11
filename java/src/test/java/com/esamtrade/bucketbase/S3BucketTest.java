@@ -47,8 +47,18 @@ class S3BucketTest {
     }
 
     @Test
+    void getListObjectsWithOver1000keys() throws IOException {
+        tester.testListObjectsWithOver1000keys();
+    }
+
+    @Test
     void shallowListObjects() throws IOException {
         tester.testShallowListObjects();
+    }
+
+    @Test
+    void shallowListObjectsWithOver1000keys() throws IOException {
+        tester.testShallowListObjectsWithOver1000keys();
     }
 
     @Test

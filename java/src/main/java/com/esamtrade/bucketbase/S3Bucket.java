@@ -17,6 +17,7 @@ import java.io.InputStream;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -164,7 +165,16 @@ public class S3Bucket extends BaseBucket {
         }
     }
 
+
     @Override
+    /**
+     * Lists all objects in the S3 bucket with the given prefix.
+     *
+     * <p>This method performs pagination to retrieve all objects, which might be slow for large datasets.</p>
+     *
+     * @param prefix The prefix to filter objects by.
+     * @return A list of paths to the objects in the bucket.
+     */
     public List<PurePosixPath> listObjects(PurePosixPath prefix) {
         splitPrefix(prefix); // validate prefix
         List<PurePosixPath> result = new ArrayList<>();
@@ -173,11 +183,9 @@ public class S3Bucket extends BaseBucket {
                 .prefix(prefix.toString())
                 .build();
 
-        ListObjectsV2Response response = s3Client.listObjectsV2(request);
-        for (S3Object object : response.contents()) {
-            result.add(new PurePosixPath(object.key()));
-        }
-        return result;
+        List<PurePosixPath> results = s3Client.listObjectsV2Paginator(request).contents().stream().map(S3Object::key).map(PurePosixPath::from).toList();
+
+        return results;
     }
 
     @Override
@@ -186,29 +194,20 @@ public class S3Bucket extends BaseBucket {
         List<PurePosixPath> objects = new ArrayList<>();
         List<PurePosixPath> prefixes = new ArrayList<>();
 
-        String continuationToken = null;
-        do {
-            ListObjectsV2Request.Builder requestBuilder = ListObjectsV2Request.builder()
-                    .bucket(bucketName)
-                    .prefix(prefix.toString())
-                    .delimiter(SEP);
+        ListObjectsV2Request request = ListObjectsV2Request.builder()
+                .bucket(bucketName)
+                .prefix(prefix.toString())
+                .delimiter(SEP)
+                .build();
 
-            if (continuationToken != null) {
-                requestBuilder.continuationToken(continuationToken);
-            }
-
-            ListObjectsV2Response response = s3Client.listObjectsV2(requestBuilder.build());
-
+        s3Client.listObjectsV2Paginator(request).stream().forEach(response -> {
             for (S3Object object : response.contents()) {
                 objects.add(new PurePosixPath(object.key()));
             }
-
             for (CommonPrefix commonPrefix : response.commonPrefixes()) {
                 prefixes.add(new PurePosixPath(commonPrefix.prefix()));
             }
-
-            continuationToken = response.nextContinuationToken();
-        } while (continuationToken != null);
+        });
 
         return new ShallowListing(objects, prefixes);
     }
@@ -243,14 +242,29 @@ public class S3Bucket extends BaseBucket {
      */
     @Override
     public List<DeleteError> removeObjects(List<PurePosixPath> names) {
-        Set<String> namesSet = names.stream()
+        List<String> validatedNames = names.stream()
                 .map(BaseBucket::validateName)
-                .collect(Collectors.toSet());
+                .toList();
+        List<DeleteError> allErrors = new ArrayList<>();
+        // Process in batches of 1000 (S3's maximum limit for a single delete operation)
+        for (int i = 0; i < validatedNames.size(); i += 1000) {
+            int endIndex = Math.min(i + 1000, validatedNames.size());
+            List<String> batch = validatedNames.subList(i, endIndex);
+
+            List<DeleteError> batchErrors = removeBatch(batch);
+            allErrors.addAll(batchErrors);
+        }
+
+        return allErrors;
+    }
+
+    private List<DeleteError> removeBatch(List<String> names) {
         List<ObjectIdentifier> keys = names.stream()
                 .map(name -> ObjectIdentifier.builder()
-                        .key(name.toString())
+                        .key(name)
                         .build())
                 .collect(Collectors.toList());
+        Set<String> namesSet = new HashSet<>(names);
 
         List<DeleteError> errors = new ArrayList<>();
         DeleteObjectsResponse response;

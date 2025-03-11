@@ -1,19 +1,30 @@
 package com.esamtrade.bucketbase;
 
-import java.io.*;
-import java.util.ArrayList;
-import java.util.Collections;
+import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.List;
+import java.util.concurrent.ForkJoinPool;
+import java.util.stream.IntStream;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertIterableEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class IBucketTester {
 
     private static final List<String> INVALID_PREFIXES = List.of("/", "/dir", "star*1", "dir1/a\\file.txt", "at@gmail", "sharp#1", "dollar$1", "comma,");
     private final BaseBucket storage;
     private final String uniqueSuffix;
+    private final String PATH_WITH_2025_KEYS = "test-dir-with-2025-keys/";
 
     public IBucketTester(BaseBucket storage) {
         this.storage = storage;
@@ -106,9 +117,7 @@ public class IBucketTester {
         storage.putObject(PurePosixPath.from(uniqueDir, "dir2/file2.txt"), "Content 2".getBytes());
         storage.putObject(PurePosixPath.from(uniqueDir + "file1.txt"), "Content 3".getBytes());
 
-        List<PurePosixPath> objects = storage.listObjects(PurePosixPath.from(uniqueDir));
-        Collections.sort(objects);
-        assertTrue(objects instanceof ArrayList);
+        List<PurePosixPath> objects = storage.listObjects(PurePosixPath.from(uniqueDir)).stream().sorted().toList();
         List<PurePosixPath> expectedObjects = List.of(
                 PurePosixPath.from(uniqueDir, "dir2/file2.txt"),
                 PurePosixPath.from(uniqueDir, "file1.txt"),
@@ -116,9 +125,7 @@ public class IBucketTester {
                                                      );
         assertEquals(expectedObjects, objects);
 
-        objects = storage.listObjects(PurePosixPath.from(uniqueDir + "/"));
-        Collections.sort(objects);
-        assertTrue(objects instanceof ArrayList);
+        objects = storage.listObjects(PurePosixPath.from(uniqueDir + "/")).stream().sorted().toList();
         expectedObjects = List.of(
                 PurePosixPath.from(uniqueDir, "dir2/file2.txt"),
                 PurePosixPath.from(uniqueDir, "file1.txt")
@@ -129,6 +136,50 @@ public class IBucketTester {
         for (String prefix : INVALID_PREFIXES) {
             assertThrows(IllegalArgumentException.class, () -> storage.listObjects(PurePosixPath.from(prefix)), "Invalid prefix: " + prefix);
         }
+    }
+
+    public void testListObjectsWithOver1000keys() throws IOException {
+        // Check if PATH_WITH_2025_KEYS exists
+        var pathWith2025Keys = ensureDirWith2025Keys();
+
+        List<PurePosixPath> objects = storage.listObjects(pathWith2025Keys);
+        assertEquals(2025, objects.size());
+    }
+
+    private PurePosixPath ensureDirWith2025Keys() throws IOException {
+        var pathWith2025Keys = new PurePosixPath(PATH_WITH_2025_KEYS);
+        List<PurePosixPath> existingKeys = storage.listObjects(pathWith2025Keys);
+        if (existingKeys.isEmpty()) {
+            // Create the directory and add 2025 files
+            try (ForkJoinPool customThreadPool = new ForkJoinPool(50)) {
+                try {
+                    customThreadPool.submit(() ->
+                                    IntStream.range(0, 2025).parallel().forEach(i -> {
+                                        try {
+                                            var path = pathWith2025Keys.join("file" + i + ".txt");
+                                            storage.putObject(path, ("Content " + i).getBytes());
+                                        } catch (IOException e) {
+                                            throw new RuntimeException(e);
+                                        }
+                                    })
+                                           ).get();
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                } finally {
+                    customThreadPool.shutdown();
+                }
+            }
+        }
+        return pathWith2025Keys;
+    }
+
+    public void testShallowListObjectsWithOver1000keys() throws IOException {
+        // Check if PATH_WITH_2025_KEYS exists
+        var pathWith2025Keys = ensureDirWith2025Keys();
+
+        ShallowListing objects = storage.shallowListObjects(pathWith2025Keys);
+        assertEquals(2025, objects.getObjects().size());
+        assertEquals(0, objects.getPrefixes().size());
     }
 
     public void testShallowListObjects() throws IOException {

@@ -82,13 +82,28 @@ public class S3BucketSDKv1 extends BaseBucket {
         return new ObjectStream(inputStream, name.toString());
     }
 
+
+    /**
+     * Retrieves a list of object paths stored in the bucket that match the given prefix.
+     * Note: this function can be slow for large buckets, as it retrieves all objects in the bucket.
+     * If the response contains over 1000 objects, the S3 API paginates it, and the function retrieves all pages.
+     *
+     * @param prefix the path prefix used to filter objects
+     * @return a list of PurePosixPath objects representing the matching objects
+     */
     @Override
     public List<PurePosixPath> listObjects(PurePosixPath prefix) {
         splitPrefix(prefix); // validate prefix
         List<PurePosixPath> result = new ArrayList<>();
         ObjectListing objectListing = s3Client.listObjects(bucketName, prefix.toString());
-        for (S3ObjectSummary summary : objectListing.getObjectSummaries()) {
-            result.add(new PurePosixPath(summary.getKey()));
+        while (true) {
+            for (S3ObjectSummary summary : objectListing.getObjectSummaries()) {
+                result.add(new PurePosixPath(summary.getKey()));
+            }
+            if (!objectListing.isTruncated()) {
+                break;
+            }
+            objectListing = s3Client.listNextBatchOfObjects(objectListing);
         }
         return result;
     }
