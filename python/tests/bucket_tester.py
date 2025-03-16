@@ -1,19 +1,19 @@
 import gzip
+import io
 from io import BytesIO
 from pathlib import PurePosixPath
+from typing import BinaryIO
 from unittest import TestCase
 
-from streamerate import slist
+from streamerate import slist, stream
 from tsx import iTSms
 
-from bucketbase.ibucket import ShallowListing, IBucket
-
-if __name__ == '__main__':
-    pass
+from bucketbase.ibucket import IBucket
 
 
 class IBucketTester:
     INVALID_PREFIXES = ["/", "/dir", "dir1//dir2", "dir1//", "star*1", "dir1/a\file.txt", "at@gmail", "sharp#1", "dollar$1", "comma,"]
+    PATH_WITH_2025_KEYS = "test-dir-with-2025-keys/"
 
     def __init__(self, storage: IBucket, test_case: TestCase) -> None:
         self.storage = storage
@@ -58,6 +58,10 @@ class IBucketTester:
         path = f"{unique_dir}/inexistent.txt"
         self.test_case.assertRaises(FileNotFoundError, self.storage.get_object, path)
 
+    def validated_put_object_stream(self, name: PurePosixPath | str, stream: BinaryIO) -> None:
+        assert isinstance(stream, io.IOBase), f"stream must be a BinaryIO, but got {type(stream)}"
+        return self.storage.put_object_stream(name, stream)
+
     def test_put_and_get_object_stream(self):
         unique_dir = f"dir{self.us}"
         # binary content
@@ -66,7 +70,7 @@ class IBucketTester:
         b_gzipped_content = gzip.compress(b_content)
         gzipped_stream = BytesIO(b_gzipped_content)
 
-        self.storage.put_object_stream(path, gzipped_stream)
+        self.validated_put_object_stream(path, gzipped_stream)
         with self.storage.get_object_stream(path) as file:
             with gzip.open(file, 'rt') as file:
                 result = [file.readline() for _ in range(3)]
@@ -79,6 +83,16 @@ class IBucketTester:
             with gzip.open(file, 'rt') as file:
                 result = file.read()
         self.test_case.assertEqual(result, "Test\ncontent")
+
+        # Here we validate that we can put_object_stream directly from get_object_stream
+        path_out = PurePosixPath(f"{unique_dir}/file1_out.bin")
+        with self.storage.get_object_stream(path) as file:
+            self.validated_put_object_stream(path_out, file)
+
+        with self.storage.get_object_stream(path_out) as file:
+            with gzip.open(file, 'rt') as file:
+                result = file.read()
+                self.test_case.assertEqual(result, "Test\ncontent")
 
         # inexistent path
         path = f"{unique_dir}/inexistent.txt"
@@ -104,6 +118,12 @@ class IBucketTester:
         # Invalid Prefix cases
         for prefix in self.INVALID_PREFIXES:
             self.test_case.assertRaises(ValueError, self.storage.list_objects, prefix)
+
+    def test_list_objects_with_over1000keys(self):
+        path_with2025_keys = self._ensure_dir_with_2025_keys()
+
+        objects = self.storage.list_objects(path_with2025_keys)
+        self.test_case.assertEquals(2025, objects.size())
 
     def test_shallow_list_objects(self):
         unique_dir = f"dir{self.us}"
@@ -131,6 +151,12 @@ class IBucketTester:
         # Invalid Prefix cases
         for prefix in self.INVALID_PREFIXES:
             self.test_case.assertRaises(ValueError, self.storage.shallow_list_objects, prefix)
+
+    def test_shallow_list_objects_with_over1000keys(self):
+        path_with2025_keys = self._ensure_dir_with_2025_keys()
+        shallow_listing = self.storage.shallow_list_objects(path_with2025_keys)
+        self.test_case.assertEquals(2025, shallow_listing.objects.size())
+        self.test_case.assertEquals(0, shallow_listing.prefixes.size())
 
     def test_exists(self):
         unique_dir = f"dir{self.us}"
@@ -163,3 +189,14 @@ class IBucketTester:
         shallow_listing = self.storage.shallow_list_objects("")
         prefixes = shallow_listing.prefixes.toSet()
         self.test_case.assertNotIn(f"{unique_dir}/", prefixes)
+
+    def _ensure_dir_with_2025_keys(self) -> str:
+        existing_keys = self.storage.list_objects(self.PATH_WITH_2025_KEYS)
+        if not existing_keys:
+            def upload_file(i):
+                path = PurePosixPath(self.PATH_WITH_2025_KEYS) / f"file{i}.txt"
+                content = f"Content {i}".encode("utf-8")
+                self.storage.put_object(path, content)
+
+            stream(range(2025)).fastmap(upload_file, poolSize=100).to_list()
+        return self.PATH_WITH_2025_KEYS

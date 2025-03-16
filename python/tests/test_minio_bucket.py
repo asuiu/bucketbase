@@ -23,8 +23,14 @@ class TestIntegratedMinioBucket(TestCase):
     def test_list_objects(self):
         self.tester.test_list_objects()
 
+    def test_list_objects_with_2025_keys(self):
+        self.tester.test_list_objects_with_over1000keys()
+
     def test_shallow_list_objects(self):
         self.tester.test_shallow_list_objects()
+
+    def test_shallow_list_objects_with_2025_keys(self):
+        self.tester.test_shallow_list_objects_with_over1000keys()
 
     def test_exists(self):
         self.tester.test_exists()

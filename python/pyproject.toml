@@ -13,19 +13,18 @@ requests = ">=2.25.1"
 streamerate = ">=1.0.5"
 pyxtension = ">=1.16.9"
 StrEnum = ">=0.4.0"
-tsx = ">=0.1.16"
 filelock= ">3.0.12"
-typing_extensions = ">=4.9.0"
 minio = { version = ">=7.2.4", optional = true }
 multiminio = { version = ">=1.0.2", optional = true }
 
 [tool.poetry.extras]
 minio = ["minio", "multiminio"]
 
-[tool.poetry.dev-dependencies]
-pytest = "~7.4.2"
-minio = ">=7.2.4"
-multiminio = ">=1.0.2"
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.5"
+minio = "^7.2.15"
+multiminio = "^1.0.2"
+tsx = ">=0.1.16"
 
 [tool.black]
 line-length = 160

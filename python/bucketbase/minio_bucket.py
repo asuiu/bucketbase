@@ -13,13 +13,13 @@ from minio.datatypes import Object
 from minio.deleteobjects import DeleteError, DeleteObject
 from multiminio import MultiMinio
 from streamerate import slist, stream
-from urllib3 import HTTPResponse
+from urllib3 import BaseHTTPResponse
 
 from bucketbase.ibucket import ShallowListing, IBucket, ObjectStream
 
 
 class MinioObjectStream(ObjectStream):
-    def __init__(self, response: HTTPResponse, object_name: PurePosixPath) -> None:
+    def __init__(self, response: BaseHTTPResponse, object_name: PurePosixPath) -> None:
         super().__init__(response, object_name)
         self._response = response
         self._size = int(response.headers.get('content-length', -1))
@@ -99,11 +99,10 @@ class MinioBucket(IBucket):
             finally:
                 response.release_conn()
 
-
     def get_object_stream(self, name: PurePosixPath | str) -> ObjectStream:
         _name = self._validate_name(name)
         try:
-            response = self._minio_client.get_object(self._bucket_name, _name)
+            response: BaseHTTPResponse = self._minio_client.get_object(self._bucket_name, _name)
         except minio.error.S3Error as e:
             if e.code == "NoSuchKey":
                 raise FileNotFoundError(f"Object {_name} not found in bucket {self._bucket_name} on Minio") from e
