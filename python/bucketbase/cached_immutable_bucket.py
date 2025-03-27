@@ -52,3 +52,8 @@ class CachedImmutableBucket(IBucket):
     def build_from_fs(cls, cache_root: Path, main: IBucket) -> "CachedImmutableBucket":
         cache_bucket = AppendOnlyFSBucket.build(cache_root)
         return CachedImmutableBucket(cache=cache_bucket, main=main)
+
+    def get_size(self, name: PurePosixPath | str) -> int:
+        if self._cache.exists(name):
+            return self._cache.get_size(name)
+        return self._main.get_size(name)

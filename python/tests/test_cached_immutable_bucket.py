@@ -164,3 +164,50 @@ class TestIntegratedCachedImmutableBucket(TestCase):
 
     def test_remove_objects(self):
         self.assertRaises(io.UnsupportedOperation, self.storage.remove_objects, ["test"])
+
+    def test_get_size(self):
+        # due to asser_called_once_with, we need to reinit each one.
+        # this could be written as different test functions, but this is more concise, IMO
+        with self.subTest("local"):
+            cache = MagicMock(spec=IBucket)
+            main = MagicMock(spec=IBucket)
+            storage = CachedImmutableBucket(cache, main)
+
+            cache.get_size.return_value = 10
+            main.get_size.return_value = 20
+            cache.exists.return_value = True
+            main.exists.return_value = True
+
+            self.assertEqual(storage.get_size("test"), 10)
+            cache.get_size.assert_called_once_with("test")
+            main.get_size.assert_not_called()
+
+        with self.subTest("remote-only"):
+            cache = MagicMock(spec=IBucket)
+            main = MagicMock(spec=IBucket)
+            storage = CachedImmutableBucket(cache, main)
+
+            cache.get_size.return_value = 100
+            main.get_size.return_value = 200
+            cache.exists.return_value = False
+            main.exists.return_value = True
+
+            self.assertEqual(storage.get_size("test"), 200)
+            cache.exists.assert_called_once_with("test")
+            cache.get_size.assert_not_called()
+            main.get_size.assert_called_once_with("test")
+
+        with self.subTest("non-existent"):
+            cache = MagicMock(spec=IBucket)
+            main = MagicMock(spec=IBucket)
+            storage = CachedImmutableBucket(cache, main)
+
+            main.exists.return_value = False
+            cache.exists.return_value = False
+            main.get_size.side_effect = FileNotFoundError
+
+            with self.assertRaises(FileNotFoundError):
+                storage.get_size("test")
+            cache.get_size.assert_not_called()
+            cache.exists.assert_called_once_with("test")
+            main.get_size.assert_called_once_with("test")
