@@ -102,5 +102,5 @@ class TestAppendOnlyFSBucket(unittest.TestCase):
         self.assertEqual(size, len(content))
 
         with self.assertRaises(FileNotFoundError):
-            bucket.get_size(f"non_existent_object_{threading.get_ident()}_{time.time_ns()}")
+            bucket.get_size(f"non_existent_object")
 

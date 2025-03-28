@@ -250,14 +250,7 @@ class AbstractAppendOnlySynchronizedBucket(IBucket):
         return content
 
     def get_size(self, name: PurePosixPath | str) -> int:
-        try:
-            self._lock_object(name)
-            return self._base_bucket.get_size(name)
-        except Exception as e:
-            raise e
-        finally:
-            self._unlock_object(name)
-
+        return self._base_bucket.get_size(name)
 
     def get_object_stream(self, name: PurePosixPath | str) -> ObjectStream:
         if self.exists(name):
