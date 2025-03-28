@@ -88,4 +88,4 @@ class MemoryBucket(IBucket):
         with self._lock:
             if _name not in self._objects:
                 raise FileNotFoundError(f"Object {_name} not found in MemoryObjectStore")
-            return len(self.get_object(name))
+            return len(self._objects[_name])  # Direct access to stored object
