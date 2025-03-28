@@ -54,6 +54,7 @@ class CachedImmutableBucket(IBucket):
         return CachedImmutableBucket(cache=cache_bucket, main=main)
 
     def get_size(self, name: PurePosixPath | str) -> int:
-        if self._cache.exists(name):
+        try:
             return self._cache.get_size(name)
-        return self._main.get_size(name)
+        except FileNotFoundError:
+            return self._main.get_size(name)
