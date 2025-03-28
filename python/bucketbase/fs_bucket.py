@@ -46,6 +46,8 @@ class FSBucket(IBucket):
     def put_object_stream(self, name: PurePosixPath | str, stream: BinaryIO) -> None:
         _name = self._validate_name(name)
         _object_path = self._root / _name
+        # create a temp file with the same name appended with a UUID, generate UUID here
+        _temp_object = _object_path.
         try:
             _object_path.parent.mkdir(parents=True, exist_ok=True)
             with _object_path.open("wb") as f:
@@ -92,6 +94,12 @@ class FSBucket(IBucket):
         """
         Performs a deep/recursive listing of all objects with given prefix.
         """
+        doExcludeTmpDir = False
+        if IBucket.BUCKETBASE_TMP_DIR_NAME.startswith(str(prefix)):
+            if prefix.startswith(IBucket.BUCKETBASE_TMP_DIR_NAME):
+                raise ValueError(f"Prefix {prefix} is not allowed as it starts with the reserved name {IBucket.BUCKETBASE_TMP_DIR_NAME}")
+            doExcludeTmpDir = True
+
         dir_path, _ = self._split_prefix(prefix)
         s_prefix = str(prefix)
 
@@ -99,6 +107,12 @@ class FSBucket(IBucket):
 
         # Here we do an optimization to avoid listing all files in the root of the ObjectStorage
         matching_objects = self._get_recurs_listing(start_list_lpath, s_prefix)
+
+        # ToDo: need to test this -- On-it 🫡
+        # TODO: amx: -- la write tre' sa ne asiguram..
+        if doExcludeTmpDir:
+            matching_objects = matching_objects.filter(lambda x: not x.as_posix().startswith(IBucket.BUCKETBASE_TMP_DIR_NAME))
+
         return matching_objects
 
     def shallow_list_objects(self, prefix: PurePosixPath | str = "") -> ShallowListing:

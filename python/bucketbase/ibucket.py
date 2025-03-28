@@ -50,7 +50,8 @@ class IBucket(PydanticValidated, ABC):
 
     SEP = "/"
     SPLIT_PREFIX_RE = re.compile(rf"^((?:[{S3_NAME_CHARS_NO_SEP}]+/)*)([{S3_NAME_CHARS_NO_SEP}]*)$")
-    OBJ_NAME_RE = re.compile(rf"^(?:[{S3_NAME_CHARS_NO_SEP}]+/)*[{S3_NAME_CHARS_NO_SEP}]+$")
+    BUCKETBASE_TMP_DIR_NAME = f".6275636b-6574-6261-7365.bb.tmp"
+    OBJ_NAME_RE = re.compile(rf"^(?!{re.escape(BUCKETBASE_TMP_DIR_NAME)})(?:[{S3_NAME_CHARS_NO_SEP}]+/)*[{S3_NAME_CHARS_NO_SEP}]+$")
     DEFAULT_ENCODING = "utf-8"
     MINIO_PATH_TEMP_SUFFIX_LEN = 43  # Minio will add to any downloaded path a `stat.etag + '.part.minio'` suffix
     WINDOWS_MAX_PATH = 260
