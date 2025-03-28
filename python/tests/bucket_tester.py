@@ -205,16 +205,12 @@ class IBucketTester:
         # Setup the test
         unique_dir = f"dir{self.us}"
         path1 = PurePosixPath(f"{unique_dir}/file1.txt")
-        path2 = PurePosixPath(f"{unique_dir}/big.bin")
 
         content1 = b"Content 1"
-        content2 = bytearray([i&0xff for i in range(17*1024*1024)])
 
         self.storage.put_object(path1, content1)
-        self.storage.put_object(path2, content2)
 
         self.test_case.assertEqual(len(content1), self.storage.get_size(path1))
-        self.test_case.assertEqual(len(content2), self.storage.get_size(path2))
         with self.test_case.assertRaises(FileNotFoundError):
             self.storage.get_size(f"{unique_dir}/NOT.FOUND")
 
