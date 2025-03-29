@@ -5,24 +5,25 @@ import unittest
 from pathlib import Path
 
 from bucketbase.fs_bucket import AppendOnlyFSBucket
-from bucketbase.memory_bucket import MemoryBucket
 
 
 class TestAppendOnlyFSBucket(unittest.TestCase):
     def setUp(self):
         # Create a temporary directory for lock files
         self.temp_dir = tempfile.TemporaryDirectory()
-        self.locks_path = Path(self.temp_dir.name)
 
-        # Mock the IBucket interface
-        self.mem_base_bucket = MemoryBucket()
+        a = AppendOnlyFSBucket.build(Path(self.temp_dir.name))
+        self.bucket = a
+
+        self.locks_path = a._locks_path
+        self.fs_bucket = a._base_bucket
 
     def tearDown(self):
         # Cleanup the temporary directory
         self.temp_dir.cleanup()
 
     def test_lock_object_creates_lock(self):
-        bucket = AppendOnlyFSBucket(self.mem_base_bucket, self.locks_path)
+        bucket = self.bucket
         object_name = "dir1/dir2/test_object"
 
         # Attempt to lock the object
@@ -31,9 +32,10 @@ class TestAppendOnlyFSBucket(unittest.TestCase):
         # Check if the lock file was created
         lock_file_path = self.locks_path / (object_name.replace(bucket.SEP, "$") + ".lock")
         self.assertTrue(lock_file_path)
+        bucket._unlock_object(object_name)
 
     def test_unlock_object_releases_lock(self):
-        bucket = AppendOnlyFSBucket(self.mem_base_bucket, self.locks_path)
+        bucket = self.bucket
         object_name = "test_object"
 
         # Lock and then unlock the object
@@ -46,7 +48,7 @@ class TestAppendOnlyFSBucket(unittest.TestCase):
         self.assertFalse(lock_file_path.exists())  # Adjust this assertion based on your lock mechanism
 
     def test_unlocking_unlocked_object_raises_assertion(self):
-        bucket = AppendOnlyFSBucket(self.mem_base_bucket, self.locks_path)
+        bucket = self.bucket
         object_name = "dir1/dir2/non_locked_object"
 
         # Expect an assertion error when trying to unlock an object that wasn't locked
@@ -55,7 +57,7 @@ class TestAppendOnlyFSBucket(unittest.TestCase):
         self.assertEqual(str(e.exception), "Object dir1/dir2/non_locked_object is not locked")
 
     def test_lock_object_with_threads(self):
-        bucket = AppendOnlyFSBucket(self.mem_base_bucket, self.locks_path)
+        bucket = self.bucket
         object_name = "shared_object"
         lock_acquired = [False, False]  # To track lock acquisition in threads
 
@@ -90,3 +92,17 @@ class TestAppendOnlyFSBucket(unittest.TestCase):
         # Verify that both threads were able to acquire the lock
         self.assertFalse(lock_acquired[0], "The first thread should have released the lock")
         self.assertTrue(lock_acquired[1], "The second thread should have acquired the lock after the first thread released it")
+
+    def test_get_size(self):
+        bucket = self.bucket
+        object_name = "test_object"
+        content = b"test content"
+
+        bucket.put_object(object_name, content)
+
+        size = bucket.get_size(object_name)
+        self.assertEqual(size, len(content))
+
+        with self.assertRaises(FileNotFoundError):
+            bucket.get_size(f"non_existent_object")
+

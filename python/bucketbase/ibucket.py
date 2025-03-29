@@ -8,7 +8,6 @@ from pathlib import PurePosixPath, Path
 from typing import Tuple, Optional, Union, Iterable, BinaryIO
 
 from pyxtension import PydanticValidated, validate
-from pyxtension.models import ImmutableExtModel
 from streamerate import slist
 from typing_extensions import Self
 
@@ -17,11 +16,9 @@ from bucketbase.errors import DeleteError
 # Source: https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-keys.html
 # As an exception - we won't allow "*" as a valid character in the name due to complications with the file systems
 S3_NAME_CHARS_NO_SEP = r"\w!\-\.')("
-S3_NAME_SAFE_RE = rf"^[{S3_NAME_CHARS_NO_SEP}][{S3_NAME_CHARS_NO_SEP}/]+$"
-
 
 @dataclass(frozen=True)
-class ShallowListing(ImmutableExtModel):
+class ShallowListing:
     """
     :param objects: list of object names, as PurePosixPath
     :param prefixes: list of prefixes (equivalent to directories on FileSystems) as strings, ending with "/"
@@ -52,7 +49,8 @@ class IBucket(PydanticValidated, ABC):
 
     SEP = "/"
     SPLIT_PREFIX_RE = re.compile(rf"^((?:[{S3_NAME_CHARS_NO_SEP}]+/)*)([{S3_NAME_CHARS_NO_SEP}]*)$")
-    OBJ_NAME_RE = re.compile(rf"^(?:[{S3_NAME_CHARS_NO_SEP}]+/)*[{S3_NAME_CHARS_NO_SEP}]+$")
+    BUCKETBASE_TMP_DIR_NAME = f".6275636b-6574-6261-7365.bb.tmp"
+    OBJ_NAME_RE = re.compile(rf"^(?!{re.escape(BUCKETBASE_TMP_DIR_NAME)})(?:[{S3_NAME_CHARS_NO_SEP}]+/)*[{S3_NAME_CHARS_NO_SEP}]+$")
     DEFAULT_ENCODING = "utf-8"
     MINIO_PATH_TEMP_SUFFIX_LEN = 43  # Minio will add to any downloaded path a `stat.etag + '.part.minio'` suffix
     WINDOWS_MAX_PATH = 260
@@ -115,6 +113,10 @@ class IBucket(PydanticValidated, ABC):
         """
         :raises FileNotFoundError: if the object is not found
         """
+        raise NotImplementedError()
+
+    @abstractmethod
+    def get_size(self, name: PurePosixPath | str) -> int:
         raise NotImplementedError()
 
     def fput_object(self, name: PurePosixPath | str, file_path: Path) -> None:
@@ -246,6 +248,9 @@ class AbstractAppendOnlySynchronizedBucket(IBucket):
         finally:
             self._unlock_object(name)
         return content
+
+    def get_size(self, name: PurePosixPath | str) -> int:
+        return self._base_bucket.get_size(name)
 
     def get_object_stream(self, name: PurePosixPath | str) -> ObjectStream:
         if self.exists(name):

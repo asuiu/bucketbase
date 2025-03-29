@@ -1,7 +1,9 @@
 import os
+import threading
 from io import BytesIO
 from pathlib import Path, PurePosixPath
 from threading import RLock
+from time import time_ns, sleep
 from typing import Dict, Iterable, Optional, Union, BinaryIO
 
 from streamerate import slist
@@ -43,17 +45,30 @@ class FSBucket(IBucket):
         stream = BytesIO(content) if isinstance(content, (bytes, bytearray)) else BytesIO(content.encode())
         self.put_object_stream(name, stream)
 
+    def _temp_object_absolute_path(self, name: PurePosixPath | str) -> Path:
+        tmp_obj_name = str(PurePosixPath(name)).replace("/","#")
+        return self._root / self.BUCKETBASE_TMP_DIR_NAME / f"{tmp_obj_name}@{str(int(time_ns()))}-{threading.get_ident()}.tmp"
+
     def put_object_stream(self, name: PurePosixPath | str, stream: BinaryIO) -> None:
         _name = self._validate_name(name)
         _object_path = self._root / _name
+
+        _object_path_temp = self._temp_object_absolute_path(name)
         try:
-            _object_path.parent.mkdir(parents=True, exist_ok=True)
-            with _object_path.open("wb") as f:
-                while True:
-                    chunk = stream.read(self.BUFFER_SIZE)
-                    if not chunk:
-                        break
+            _object_path_temp.parent.mkdir(parents=True, exist_ok=True)
+            with _object_path_temp.open("wb") as f:
+                while chunk := stream.read(self.BUFFER_SIZE):
                     f.write(chunk)
+            _object_path.parent.mkdir(parents=True, exist_ok=True)
+            for attempt in range(10):
+                try:
+                    os.replace(_object_path_temp, _object_path)
+                    return
+                except PermissionError:
+                    if attempt < 9:
+                        sleep(0.05)
+                    else:
+                        raise
         except FileNotFoundError as exc:
             if os.name == "nt":
                 if len(str(_object_path)) >= self.WINDOWS_MAX_PATH - self.MINIO_PATH_TEMP_SUFFIX_LEN:
@@ -92,6 +107,12 @@ class FSBucket(IBucket):
         """
         Performs a deep/recursive listing of all objects with given prefix.
         """
+        do_exclude_tmp_dir = False
+        if IBucket.BUCKETBASE_TMP_DIR_NAME.startswith(str(prefix)):
+            if prefix.startswith(IBucket.BUCKETBASE_TMP_DIR_NAME):
+                raise ValueError(f"Prefix {prefix} is not allowed as it starts with the reserved name {IBucket.BUCKETBASE_TMP_DIR_NAME}")
+            do_exclude_tmp_dir = True
+
         dir_path, _ = self._split_prefix(prefix)
         s_prefix = str(prefix)
 
@@ -99,12 +120,20 @@ class FSBucket(IBucket):
 
         # Here we do an optimization to avoid listing all files in the root of the ObjectStorage
         matching_objects = self._get_recurs_listing(start_list_lpath, s_prefix)
+
+        if do_exclude_tmp_dir:
+            matching_objects = matching_objects.filter(lambda x: not x.as_posix().startswith(IBucket.BUCKETBASE_TMP_DIR_NAME))
+
         return matching_objects
 
     def shallow_list_objects(self, prefix: PurePosixPath | str = "") -> ShallowListing:
         """
         Performs a non-recursive listing of all objects with given prefix.
         """
+        if IBucket.BUCKETBASE_TMP_DIR_NAME.startswith(str(prefix)):
+            if prefix.startswith(IBucket.BUCKETBASE_TMP_DIR_NAME):
+                raise ValueError(f"Prefix {prefix} is not allowed as it starts with the reserved name {IBucket.BUCKETBASE_TMP_DIR_NAME}")
+
         dir_path, name_prefix = self._split_prefix(prefix)
         start_list_lpath = self._root / dir_path
 
@@ -117,6 +146,8 @@ class FSBucket(IBucket):
                 matching_objects.append(obj_path)
             elif p.is_dir():
                 dir_path = p.relative_to(self._root).as_posix() + "/"
+                if dir_path.startswith(IBucket.BUCKETBASE_TMP_DIR_NAME):
+                    continue
                 prefixes.append(dir_path)
             else:
                 raise ValueError(f"Unexpected path type: {p}")
@@ -159,6 +190,9 @@ class FSBucket(IBucket):
         """ This is not part of the IBucket interface, but it's useful for multiple purposes. """
         return self._root
 
+    def get_size(self, name: PurePosixPath | str) -> int:
+        return os.stat(self._root / name).st_size
+
 
 class AppendOnlyFSBucket(AbstractAppendOnlySynchronizedBucket):
     """
@@ -197,5 +231,5 @@ class AppendOnlyFSBucket(AbstractAppendOnlySynchronizedBucket):
     @classmethod
     def build(cls, root: Path, locks_path: Optional[Path] = None) -> "AppendOnlyFSBucket":
         if locks_path is None:
-            locks_path = root / "__locks__"
+            locks_path = root / cls.BUCKETBASE_TMP_DIR_NAME / "__locks__"
         return cls(FSBucket(root), locks_path)
