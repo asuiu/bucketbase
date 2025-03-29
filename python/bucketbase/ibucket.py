@@ -16,7 +16,6 @@ from bucketbase.errors import DeleteError
 # Source: https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-keys.html
 # As an exception - we won't allow "*" as a valid character in the name due to complications with the file systems
 S3_NAME_CHARS_NO_SEP = r"\w!\-\.')("
-S3_NAME_SAFE_RE = rf"^[{S3_NAME_CHARS_NO_SEP}][{S3_NAME_CHARS_NO_SEP}/]+$"
 
 @dataclass(frozen=True)
 class ShallowListing:
